@@ -173,7 +173,6 @@
         let totalPriceGbp = 0;
         let isDataLoaded = false;
 
-        // *** BUG FIX: Using a Set for sold blocks for accurate checking ***
         const soldBlocksCache = new Set();
         let isDragging = false;
         let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
@@ -243,7 +242,6 @@
                     img.src = pixel.img;
                     img.onload = () => {
                         gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
-                        // *** BUG FIX: Populate the block-based cache ***
                         for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
                             for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
                                 soldBlocksCache.add(`${i},${j}`);
@@ -310,7 +308,6 @@
                 return;
             }
 
-            // *** BUG FIX: More robust block-based overlap check ***
             for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i += PIXEL_BLOCK_SIZE) {
                 for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j += PIXEL_BLOCK_SIZE) {
                     if (soldBlocksCache.has(`${i},${j}`)) {
