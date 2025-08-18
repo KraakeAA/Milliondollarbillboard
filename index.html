@@ -202,7 +202,7 @@
             const container = document.getElementById('message-container');
             const messageDiv = document.createElement('div');
             const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
-            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
             messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
             messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
             container.appendChild(messageDiv);
@@ -286,10 +286,9 @@
             document.getElementById('total-price-usd').textContent = totalPriceUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             document.getElementById('total-price-gbp').textContent = `£${totalPriceGbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             
-            // *** BUG FIX: Re-render PayPal buttons every time modal opens ***
             const paypalContainer = document.getElementById('paypal-button-container');
-            paypalContainer.innerHTML = ''; // Clear old buttons
-            renderPayPalButtons(); // Render new ones
+            paypalContainer.innerHTML = '';
+            renderPayPalButtons();
 
             const modal = document.getElementById('purchase-modal');
             modal.classList.remove('hidden');
@@ -413,6 +412,11 @@
                             showMessage('Payment successful, but the image processing failed.', 'error');
                         }
                     }),
+                    // *** NEW: onCancel function ***
+                    onCancel: (data) => {
+                        showMessage('Payment was cancelled.', 'info');
+                        console.log('Checkout cancelled:', data);
+                    },
                     onError: (err) => showMessage('An error occurred with the payment.', 'error')
                 }).render('#paypal-button-container');
             } catch (error) {
