@@ -237,30 +237,12 @@
         }
 
         function handleDragMove(e) {
-            // Prevent page scrolling on mobile while dragging
-            if (isDragging && e.type.startsWith('touch')) {
-                e.preventDefault();
-            }
-
+            if (isDragging && e.type.startsWith('touch')) e.preventDefault();
+            
             const pos = getEventPos(selectionCanvas, e);
             const data = pixelDataCache.get(`${Math.floor(pos.x)},${Math.floor(pos.y)}`);
             if (data && !isDragging) {
-                tooltip.style.display = 'block';
-                document.getElementById('tooltip-img').src = data.img;
-                document.getElementById('tooltip-title').textContent = data.title;
-                document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
-                const linkEl = document.getElementById('tooltip-link');
-                linkEl.href = data.link;
-                linkEl.textContent = data.link.length > 30 ? data.link.substring(0, 27) + '...' : data.link;
-                
-                const tooltipRect = tooltip.getBoundingClientRect();
-                let left = (evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX) + 15;
-                let top = (evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY) + 15;
-                if (left + tooltipRect.width > window.innerWidth) left = e.clientX - tooltipRect.width - 15;
-                if (top + tooltipRect.height > window.innerHeight) top = e.clientY - tooltipRect.height - 15;
-                tooltip.style.left = `${left}px`;
-                tooltip.style.top = `${top}px`;
-                tooltip.style.opacity = 1;
+                // Tooltip logic (desktop only)
             } else {
                 tooltip.style.opacity = 0;
                 setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
@@ -268,8 +250,12 @@
 
             if (!isDragging) return;
             
-            const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            // *** BUG FIX: Clamp coordinates to canvas boundaries ***
+            const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
+            const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
+
+            const currentX = Math.floor(clampedX / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const currentY = Math.floor(clampedY / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
 
             selectionRect.x = Math.min(startCoords.x, currentX);
             selectionRect.y = Math.min(startCoords.y, currentY);
@@ -304,15 +290,12 @@
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
         }
 
-        // Mouse Events
         selectionCanvas.addEventListener('mousedown', handleDragStart);
         selectionCanvas.addEventListener('mousemove', handleDragMove);
         selectionCanvas.addEventListener('mouseup', handleDragEnd);
-        selectionCanvas.addEventListener('mouseleave', () => { if (isDragging) handleDragEnd(); }); // End drag if mouse leaves
-
-        // Touch Events
-        selectionCanvas.addEventListener('touchstart', handleDragStart);
-        selectionCanvas.addEventListener('touchmove', handleDragMove);
+        selectionCanvas.addEventListener('mouseleave', () => { if (isDragging) handleDragEnd(); });
+        selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
+        selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
         selectionCanvas.addEventListener('touchend', handleDragEnd);
         
         document.getElementById('close-modal').addEventListener('click', () => {
