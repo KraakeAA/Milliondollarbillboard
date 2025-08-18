@@ -161,7 +161,7 @@
         const PIXEL_BLOCK_SIZE = 10;
         const PRICE_PER_BLOCK_USD = 100.00; 
         
-        let usdToGbpRate = 0.80; // Fallback rate
+        let usdToGbpRate = 0.80;
         let totalPriceGbp = 0;
 
         const pixelDataCache = new Map();
@@ -176,7 +176,6 @@
                 const data = await response.json();
                 if (data && data.rates && data.rates.GBP) {
                     usdToGbpRate = data.rates.GBP;
-                    console.log(`Successfully fetched USD to GBP rate: ${usdToGbpRate}`);
                 }
             } catch (error) {
                 console.error("Could not fetch exchange rate, using fallback rate.", error);
@@ -287,6 +286,11 @@
             document.getElementById('total-price-usd').textContent = totalPriceUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             document.getElementById('total-price-gbp').textContent = `£${totalPriceGbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             
+            // *** BUG FIX: Re-render PayPal buttons every time modal opens ***
+            const paypalContainer = document.getElementById('paypal-button-container');
+            paypalContainer.innerHTML = ''; // Clear old buttons
+            renderPayPalButtons(); // Render new ones
+
             const modal = document.getElementById('purchase-modal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
@@ -354,64 +358,66 @@
             });
         }
 
-        try {
-            paypal.Buttons({
-                onClick: (data, actions) => {
-                    if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-                        showMessage('Please fill out all fields and upload an image.', 'error');
-                        return actions.reject();
-                    }
-                    for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
-                        for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
-                            if (pixelDataCache.has(`${i},${j}`)) {
-                                showMessage('Your selection overlaps with purchased pixels.', 'error');
-                                return actions.reject();
+        function renderPayPalButtons() {
+            try {
+                paypal.Buttons({
+                    onClick: (data, actions) => {
+                        if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                            showMessage('Please fill out all fields and upload an image.', 'error');
+                            return actions.reject();
+                        }
+                        for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
+                            for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
+                                if (pixelDataCache.has(`${i},${j}`)) {
+                                    showMessage('Your selection overlaps with purchased pixels.', 'error');
+                                    return actions.reject();
+                                }
                             }
                         }
-                    }
-                    return actions.resolve();
-                },
-                createOrder: (data, actions) => {
-                    return actions.order.create({
-                        purchase_units: [{
-                            description: `${selectionRect.w}x${selectionRect.h} Pixels on The Million Dollar Billboard`,
-                            amount: { value: totalPriceGbp.toFixed(2) }
-                        }]
-                    });
-                },
-                onApprove: (data, actions) => actions.order.capture().then(async (details) => {
-                    showMessage('Payment approved! Processing image...', 'info');
-                    try {
-                        const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-                        const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-                        const storageRef = ref(storage, fileName);
-                        const snapshot = await uploadBytes(storageRef, processedImageBlob);
-                        const downloadURL = await getDownloadURL(snapshot.ref);
-                        const newPixelData = {
-                            ...selectionRect,
-                            title: document.getElementById('title').value,
-                            owner: details.payer.name.given_name,
-                            link: document.getElementById('link-url').value,
-                            img: downloadURL,
-                            purchaseDate: new Date().toISOString()
-                        };
-                        const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
-                        await setDoc(doc(db, "pixels", docId), newPixelData);
-                        showMessage('Upload complete! Your pixels are live.', 'success');
-                        document.getElementById('close-modal').click();
-                        document.getElementById('image-upload').value = '';
-                        document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
-                        ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-                        selectedFile = null;
-                    } catch (error) {
-                        console.error("Error during upload or save: ", error);
-                        showMessage('Payment successful, but the image processing failed.', 'error');
-                    }
-                }),
-                onError: (err) => showMessage('An error occurred with the payment.', 'error')
-            }).render('#paypal-button-container');
-        } catch (error) {
-            console.error("Failed to render PayPal buttons", error);
+                        return actions.resolve();
+                    },
+                    createOrder: (data, actions) => {
+                        return actions.order.create({
+                            purchase_units: [{
+                                description: `${selectionRect.w}x${selectionRect.h} Pixels on The Million Dollar Billboard`,
+                                amount: { value: totalPriceGbp.toFixed(2) }
+                            }]
+                        });
+                    },
+                    onApprove: (data, actions) => actions.order.capture().then(async (details) => {
+                        showMessage('Payment approved! Processing image...', 'info');
+                        try {
+                            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                            const storageRef = ref(storage, fileName);
+                            const snapshot = await uploadBytes(storageRef, processedImageBlob);
+                            const downloadURL = await getDownloadURL(snapshot.ref);
+                            const newPixelData = {
+                                ...selectionRect,
+                                title: document.getElementById('title').value,
+                                owner: details.payer.name.given_name,
+                                link: document.getElementById('link-url').value,
+                                img: downloadURL,
+                                purchaseDate: new Date().toISOString()
+                            };
+                            const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
+                            await setDoc(doc(db, "pixels", docId), newPixelData);
+                            showMessage('Upload complete! Your pixels are live.', 'success');
+                            document.getElementById('close-modal').click();
+                            document.getElementById('image-upload').value = '';
+                            document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
+                            ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                            selectedFile = null;
+                        } catch (error) {
+                            console.error("Error during upload or save: ", error);
+                            showMessage('Payment successful, but the image processing failed.', 'error');
+                        }
+                    }),
+                    onError: (err) => showMessage('An error occurred with the payment.', 'error')
+                }).render('#paypal-button-container');
+            } catch (error) {
+                console.error("Failed to render PayPal buttons", error);
+            }
         }
 
         fetchExchangeRate();
