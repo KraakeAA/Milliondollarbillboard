@@ -125,6 +125,7 @@
                 </div>
             </div>
             <div id="paypal-button-container" class="mt-4"></div>
+            <!-- Test button will be added here by the script -->
         </div>
     </div>
     
@@ -138,6 +139,9 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+
+        // --- IMPORTANT: Set to 'false' before going live! ---
+        const TEST_MODE = true;
 
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
@@ -357,6 +361,36 @@
             });
         }
 
+        async function handlePurchase(ownerName = 'Test User') {
+            showMessage('Processing image...', 'info');
+            try {
+                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                const storageRef = ref(storage, fileName);
+                const snapshot = await uploadBytes(storageRef, processedImageBlob);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                const newPixelData = {
+                    ...selectionRect,
+                    title: document.getElementById('title').value,
+                    owner: ownerName,
+                    link: document.getElementById('link-url').value,
+                    img: downloadURL,
+                    purchaseDate: new Date().toISOString()
+                };
+                const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
+                await setDoc(doc(db, "pixels", docId), newPixelData);
+                showMessage('Upload complete! Your pixels are live.', 'success');
+                document.getElementById('close-modal').click();
+                document.getElementById('image-upload').value = '';
+                document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
+                ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                selectedFile = null;
+            } catch (error) {
+                console.error("Error during upload or save: ", error);
+                showMessage('Image processing failed.', 'error');
+            }
+        }
+
         function renderPayPalButtons() {
             try {
                 paypal.Buttons({
@@ -383,45 +417,32 @@
                             }]
                         });
                     },
-                    onApprove: (data, actions) => actions.order.capture().then(async (details) => {
-                        showMessage('Payment approved! Processing image...', 'info');
-                        try {
-                            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-                            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-                            const storageRef = ref(storage, fileName);
-                            const snapshot = await uploadBytes(storageRef, processedImageBlob);
-                            const downloadURL = await getDownloadURL(snapshot.ref);
-                            const newPixelData = {
-                                ...selectionRect,
-                                title: document.getElementById('title').value,
-                                owner: details.payer.name.given_name,
-                                link: document.getElementById('link-url').value,
-                                img: downloadURL,
-                                purchaseDate: new Date().toISOString()
-                            };
-                            const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
-                            await setDoc(doc(db, "pixels", docId), newPixelData);
-                            showMessage('Upload complete! Your pixels are live.', 'success');
-                            document.getElementById('close-modal').click();
-                            document.getElementById('image-upload').value = '';
-                            document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
-                            ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-                            selectedFile = null;
-                        } catch (error) {
-                            console.error("Error during upload or save: ", error);
-                            showMessage('Payment successful, but the image processing failed.', 'error');
-                        }
+                    onApprove: (data, actions) => actions.order.capture().then((details) => {
+                        handlePurchase(details.payer.name.given_name);
                     }),
-                    // *** NEW: onCancel function ***
                     onCancel: (data) => {
                         showMessage('Payment was cancelled.', 'info');
-                        console.log('Checkout cancelled:', data);
                     },
                     onError: (err) => showMessage('An error occurred with the payment.', 'error')
                 }).render('#paypal-button-container');
             } catch (error) {
                 console.error("Failed to render PayPal buttons", error);
             }
+        }
+
+        // --- Test Mode Logic ---
+        if (TEST_MODE) {
+            const testButton = document.createElement('button');
+            testButton.textContent = 'Test Upload (No Payment)';
+            testButton.className = 'w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg transition-colors';
+            testButton.onclick = () => {
+                if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                    showMessage('Please fill out all fields and upload an image.', 'error');
+                    return;
+                }
+                handlePurchase(); // Call the purchase logic directly
+            };
+            document.getElementById('paypal-button-container').after(testButton);
         }
 
         fetchExchangeRate();
