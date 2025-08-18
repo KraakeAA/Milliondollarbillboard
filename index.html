@@ -19,7 +19,6 @@
             background-color: #0a0a0a;
             background-image: radial-gradient(circle at 50% 30%, rgba(0, 255, 255, 0.05), rgba(10, 10, 10, 0) 30%);
         }
-        /* BUG FIX: Adjusted max-width to account for padding */
         .billboard-frame {
             background: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #333;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5); position: relative;
@@ -72,7 +71,7 @@
                 <div class="billboard-spotlight"></div>
                 <div class="relative w-full aspect-square bg-gray-800 canvas-container">
                     <canvas id="pixel-grid" width="1000" height="1000"></canvas>
-                    <canvas id="selection-canvas" width="1000" height="1000"></canvas>
+                    <canvas id="selection-canvas" width="1000" height="1000" class="pointer-events-none"></canvas>
                     <!-- Loading Overlay -->
                     <div id="loading-overlay" class="absolute inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center z-10">
                         <p class="text-white text-xl animate-pulse">Loading Billboard...</p>
@@ -145,7 +144,7 @@
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // --- IMPORTANT: Set to 'false' before going live! ---
-        const TEST_MODE = false;
+        const TEST_MODE = true;
 
         const firebaseConfig = {
             apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
@@ -243,11 +242,10 @@
                 }
             });
 
-            // BUG FIX: Unlock the canvas only after the initial data is loaded
             if (!isDataLoaded) {
                 isDataLoaded = true;
                 loadingOverlay.style.display = 'none';
-                console.log("Billboard data loaded. Ready for selection.");
+                selectionCanvas.classList.remove('pointer-events-none');
             }
         });
 
