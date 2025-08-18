@@ -224,6 +224,16 @@
 
         const pixelsCollection = collection(db, "pixels");
         const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
+            const initialDocs = snapshot.docChanges().filter(change => change.type === "added");
+            let loadedImageCount = 0;
+
+            if (snapshot.empty && !isDataLoaded) {
+                isDataLoaded = true;
+                loadingOverlay.style.display = 'none';
+                selectionCanvas.classList.remove('pointer-events-none');
+                return;
+            }
+
             snapshot.docChanges().forEach((change) => {
                 const pixel = change.doc.data();
                 if (change.type === "added" || change.type === "modified") {
@@ -238,15 +248,18 @@
                             }
                         }
                         updateStats();
+
+                        if (!isDataLoaded && change.type === "added") {
+                            loadedImageCount++;
+                            if (loadedImageCount === initialDocs.length) {
+                                isDataLoaded = true;
+                                loadingOverlay.style.display = 'none';
+                                selectionCanvas.classList.remove('pointer-events-none');
+                            }
+                        }
                     };
                 }
             });
-
-            if (!isDataLoaded) {
-                isDataLoaded = true;
-                loadingOverlay.style.display = 'none';
-                selectionCanvas.classList.remove('pointer-events-none');
-            }
         });
 
         function getEventPos(canvas, evt) {
