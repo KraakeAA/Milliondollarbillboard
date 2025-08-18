@@ -173,7 +173,8 @@
         let totalPriceGbp = 0;
         let isDataLoaded = false;
 
-        const pixelDataCache = new Map();
+        // *** BUG FIX: Using a Set for sold blocks for accurate checking ***
+        const soldBlocksCache = new Set();
         let isDragging = false;
         let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
         let startCoords = { x: 0, y: 0 };
@@ -201,10 +202,10 @@
         }
         
         function updateStats() {
-            const soldCount = pixelDataCache.size;
+            const totalSoldBlocks = soldBlocksCache.size;
             const totalPixels = GRID_SIZE * GRID_SIZE;
-            document.getElementById('pixels-sold').textContent = soldCount.toLocaleString();
-            document.getElementById('pixels-remaining').textContent = (totalPixels - soldCount).toLocaleString();
+            document.getElementById('pixels-sold').textContent = (totalSoldBlocks * 100).toLocaleString();
+            document.getElementById('pixels-remaining').textContent = (totalPixels - (totalSoldBlocks * 100)).toLocaleString();
         }
 
         function showMessage(text, type = 'info') {
@@ -242,9 +243,10 @@
                     img.src = pixel.img;
                     img.onload = () => {
                         gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
-                        for (let i = pixel.x; i < pixel.x + pixel.w; i++) {
-                            for (let j = pixel.y; j < pixel.y + pixel.h; j++) {
-                                pixelDataCache.set(`${i},${j}`, pixel);
+                        // *** BUG FIX: Populate the block-based cache ***
+                        for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
+                            for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
+                                soldBlocksCache.add(`${i},${j}`);
                             }
                         }
                         updateStats();
@@ -308,15 +310,15 @@
                 return;
             }
 
-            // *** BUG FIX: Check for overlap BEFORE opening the modal ***
-            for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
-                for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
-                    if (pixelDataCache.has(`${i},${j}`)) {
+            // *** BUG FIX: More robust block-based overlap check ***
+            for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i += PIXEL_BLOCK_SIZE) {
+                for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j += PIXEL_BLOCK_SIZE) {
+                    if (soldBlocksCache.has(`${i},${j}`)) {
                         showMessage('Selection overlaps with an owned area.', 'error');
                         selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
                         selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
                         setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
-                        return; // Stop execution
+                        return;
                     }
                 }
             }
@@ -437,15 +439,6 @@
                         if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
                             showMessage('Please fill out all fields and upload an image.', 'error');
                             return actions.reject();
-                        }
-                        // This check is now redundant but kept as a failsafe
-                        for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
-                            for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
-                                if (pixelDataCache.has(`${i},${j}`)) {
-                                    showMessage('Your selection overlaps with purchased pixels.', 'error');
-                                    return actions.reject();
-                                }
-                            }
                         }
                         return actions.resolve();
                     },
