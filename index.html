@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Million Dollar Billboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PayPal SDK -->
-    <!-- IMPORTANT: Replace 'YOUR_CLIENT_ID' with your actual PayPal Client ID -->
-    <script src="https://www.paypal.com/sdk/js?client-id=YOUR_CLIENT_ID&currency=USD"></script>
+    
+    <!--
+      STEP 1: PASTE YOUR PAYPAL CLIENT ID
+      Replace 'YOUR_CLIENT_ID' below with the Client ID you copied from your PayPal Developer Dashboard.
+    -->
+    <script src="https://www.paypal.com/sdk/js?client-id=ATP3i6lIdhX-ot734c4Hg5HCButYu740X7g5H7L3RVmZ4UTbbG-LC8d819AiTpbQFOPxa71ju82KgYZ7&currency=USD"></script>
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://www.css.gg/css?=|check|info" rel="stylesheet">
@@ -19,51 +23,24 @@
             background-image: radial-gradient(circle at 50% 30%, rgba(0, 255, 255, 0.05), rgba(10, 10, 10, 0) 30%);
         }
         .billboard-frame {
-            background: #1a1a1a;
-            padding: 20px;
-            border-radius: 10px;
-            border: 2px solid #333;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5);
-            position: relative;
+            background: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5); position: relative;
         }
         .billboard-spotlight {
-            position: absolute;
-            top: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60%;
-            height: 40px;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
-            clip-path: polygon(10% 0, 90% 0, 100% 100%, 0% 100%);
-            opacity: 0.5;
+            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            width: 60%; height: 40px; background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
+            clip-path: polygon(10% 0, 90% 0, 100% 100%, 0% 100%); opacity: 0.5;
         }
         .billboard-stand {
-            width: 100px;
-            height: 80px;
-            background: #1a1a1a;
-            margin: 0 auto;
-            position: relative;
-            border-left: 2px solid #333;
-            border-right: 2px solid #333;
-            border-bottom: 2px solid #333;
+            width: 100px; height: 80px; background: #1a1a1a; margin: 0 auto; position: relative;
+            border-left: 2px solid #333; border-right: 2px solid #333; border-bottom: 2px solid #333;
         }
         .billboard-stand::before {
-            content: '';
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 150px;
-            height: 20px;
-            background: #111;
-            border-radius: 5px;
-            border: 2px solid #333;
+            content: ''; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+            width: 150px; height: 20px; background: #111; border-radius: 5px; border: 2px solid #333;
         }
         canvas {
-            image-rendering: -moz-crisp-edges;
-            image-rendering: -webkit-crisp-edges;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
+            image-rendering: pixelated; image-rendering: crisp-edges;
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
         }
         ::-webkit-scrollbar { width: 8px; }
@@ -91,10 +68,8 @@
         <div class="mb-8">
             <div class="billboard-frame max-w-[1020px] mx-auto">
                 <div class="billboard-spotlight"></div>
-                <!-- The Billboard Grid -->
                 <div class="relative w-full aspect-square bg-gray-800">
                     <canvas id="pixel-grid" width="1000" height="1000" class="absolute top-0 left-0 w-full h-full"></canvas>
-                    <!-- Tooltip for pixel info -->
                     <div id="tooltip" class="hidden absolute bg-black bg-opacity-80 backdrop-blur-sm text-white text-sm rounded-lg p-3 border border-gray-600 shadow-xl pointer-events-none transition-opacity duration-200 z-10">
                         <img id="tooltip-img" src="" alt="Pixel Image" class="w-16 h-16 rounded-md mb-2 border-2 border-cyan-400 object-cover" onerror="this.src='https://placehold.co/64x64/083344/FFFFFF?text=Error'">
                         <h3 id="tooltip-title" class="font-bold text-base text-cyan-300"></h3>
@@ -114,11 +89,11 @@
             </div>
             <div class="text-center mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Pixels Sold</p>
-                <p id="pixels-sold" class="text-3xl font-bold text-cyan-400">4,800</p>
+                <p id="pixels-sold" class="text-3xl font-bold text-cyan-400">0</p>
             </div>
             <div class="text-center mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Remaining</p>
-                <p id="pixels-remaining" class="text-3xl font-bold text-white">995,200</p>
+                <p id="pixels-remaining" class="text-3xl font-bold text-white">1,000,000</p>
             </div>
             <button id="buy-button" class="bg-cyan-500 hover:bg-cyan-400 text-white font-bold py-3 px-8 rounded-lg text-lg transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-500/20">
                 Buy A Pixel Block
@@ -133,281 +108,264 @@
                 <h2 class="text-2xl font-bold text-white">Purchase Your Pixels</h2>
                 <button id="close-modal" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
             </div>
-            <!-- Form for pixel details -->
             <div id="purchase-details">
                 <div class="mb-4">
                     <label for="pixels-coords" class="block text-sm font-medium text-gray-300 mb-1">Selected Pixels</label>
-                    <input type="text" id="pixels-coords" name="pixels-coords" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" readonly placeholder="Click on the grid to select">
+                    <input type="text" id="pixels-coords" name="pixels-coords" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" readonly placeholder="Click on the grid to select">
                 </div>
                  <div class="mb-4">
                     <label for="image-url" class="block text-sm font-medium text-gray-300 mb-1">Image URL</label>
-                    <input type="url" id="image-url" name="image-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" required placeholder="https://example.com/image.png">
+                    <input type="url" id="image-url" name="image-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="https://example.com/image.png">
                 </div>
                 <div class="mb-4">
                     <label for="link-url" class="block text-sm font-medium text-gray-300 mb-1">Link URL</label>
-                    <input type="url" id="link-url" name="link-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" required placeholder="https://yourwebsite.com">
+                    <input type="url" id="link-url" name="link-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="https://yourwebsite.com">
                 </div>
                 <div class="mb-6">
                     <label for="title" class="block text-sm font-medium text-gray-300 mb-1">Title / Alt Text</label>
-                    <input type="text" id="title" name="title" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500" required placeholder="Your company name or message">
+                    <input type="text" id="title" name="title" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="Your company name or message">
                 </div>
             </div>
-            <!-- PayPal button container -->
             <div id="paypal-button-container" class="mt-4"></div>
-            <p id="paypal-error" class="text-red-500 text-sm mt-2 text-center hidden"></p>
         </div>
     </div>
     
-    <!-- Message Boxes -->
     <div id="message-container" class="fixed bottom-5 right-5 z-50 flex flex-col items-end space-y-2"></div>
 
-
-    <!-- Footer -->
     <footer class="text-center py-6 mt-8 border-t border-gray-800">
         <p class="text-gray-500">&copy; 2025 The Million Dollar Billboard. All rights reserved.</p>
-        <p class="text-xs text-gray-600 mt-2">A modern homage to a classic internet idea. Not affiliated with the original Million Dollar Homepage.</p>
     </footer>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const canvas = document.getElementById('pixel-grid');
-            const ctx = canvas.getContext('2d');
-            const tooltip = document.getElementById('tooltip');
-            const tooltipImg = document.getElementById('tooltip-img');
-            const tooltipTitle = document.getElementById('tooltip-title');
-            const tooltipOwner = document.getElementById('tooltip-owner');
-            const tooltipLink = document.getElementById('tooltip-link');
-            
-            const buyButton = document.getElementById('buy-button');
-            const modal = document.getElementById('purchase-modal');
-            const closeModalButton = document.getElementById('close-modal');
-            
-            const GRID_SIZE = 1000;
-            const PIXEL_BLOCK_SIZE = 10;
-            const PRICE_PER_BLOCK = 100.00;
-            const NUM_BLOCKS = GRID_SIZE / PIXEL_BLOCK_SIZE;
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-            const pixelData = new Map();
+        // --- Firebase and App Setup ---
 
-            function addPixelData(x, y, width, height, data) {
-                for (let i = x; i < x + width; i++) {
-                    for (let j = y; j < y + height; j++) {
-                        pixelData.set(`${i},${j}`, data);
-                    }
-                }
+        // STEP 2: PASTE YOUR FIREBASE CONFIG OBJECT
+        // Replace the object below with the one you copied from your Firebase project settings.
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- Global Variables & Constants ---
+        const canvas = document.getElementById('pixel-grid');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+        const GRID_SIZE = 1000;
+        const PIXEL_BLOCK_SIZE = 10;
+        const PRICE_PER_BLOCK = 100.00;
+        
+        // This local cache will store pixel data for quick lookups (for the tooltip).
+        const pixelDataCache = new Map();
+
+        // --- Drawing and UI Functions ---
+        function drawGridLines() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= GRID_SIZE; i += PIXEL_BLOCK_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, GRID_SIZE);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(GRID_SIZE, i);
+                ctx.stroke();
             }
+        }
+        
+        function updateStats() {
+            const soldCount = pixelDataCache.size;
+            const totalPixels = GRID_SIZE * GRID_SIZE;
+            document.getElementById('pixels-sold').textContent = soldCount.toLocaleString();
+            document.getElementById('pixels-remaining').textContent = (totalPixels - soldCount).toLocaleString();
+        }
 
-            const samplePixels = [
-                { x: 50, y: 50, w: 20, h: 20, title: "Gemini AI", owner: "Google", link: "https://gemini.google.com", img: "https://placehold.co/40x40/4285F4/FFFFFF?text=G" },
-                { x: 120, y: 100, w: 10, h: 10, title: "OpenAI", owner: "Microsoft", link: "https://openai.com", img: "https://placehold.co/20x20/19C37D/FFFFFF?text=O" },
-                { x: 200, y: 200, w: 30, h: 10, title: "Tailwind CSS", owner: "Tailwind Labs", link: "https://tailwindcss.com", img: "https://placehold.co/60x20/38BDF8/FFFFFF?text=CSS" },
-                { x: 400, y: 400, w: 40, h: 40, title: "Your Ad Here", owner: "Available", link: "#", img: "https://placehold.co/80x80/111827/9CA3AF?text=Buy+Me" }
-            ];
+        function showMessage(text, type = 'info') {
+            const container = document.getElementById('message-container');
+            const messageDiv = document.createElement('div');
+            const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
+            messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
+            container.appendChild(messageDiv);
+            setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
+            setTimeout(() => {
+                messageDiv.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => messageDiv.remove(), 300);
+            }, 4000);
+        }
 
-            samplePixels.forEach(p => {
-                const data = { ...p, image: new Image() };
-                data.image.src = p.img;
-                data.image.onload = () => drawGrid();
-                addPixelData(p.x, p.y, p.w, p.h, data);
-            });
+        // --- Firebase Firestore Integration ---
 
-            function drawGrid() {
-                ctx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.lineWidth = 1;
-                for (let i = 0; i < NUM_BLOCKS; i++) {
-                    ctx.beginPath();
-                    ctx.moveTo(i * PIXEL_BLOCK_SIZE, 0);
-                    ctx.lineTo(i * PIXEL_BLOCK_SIZE, GRID_SIZE);
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(0, i * PIXEL_BLOCK_SIZE);
-                    ctx.lineTo(GRID_SIZE, i * PIXEL_BLOCK_SIZE);
-                    ctx.stroke();
-                }
-                
-                const drawnRects = new Set();
-                pixelData.forEach((data) => {
-                    const rectKey = `${data.x},${data.y}`;
-                    if (!drawnRects.has(rectKey)) {
-                        if (data.image && data.image.complete) {
-                            ctx.drawImage(data.image, data.x, data.y, data.w, data.h);
+        // Listen for real-time updates from the 'pixels' collection
+        const pixelsCollection = collection(db, "pixels");
+        onSnapshot(pixelsCollection, (snapshot) => {
+            console.log("Received database update.");
+            snapshot.docChanges().forEach((change) => {
+                const pixel = change.doc.data();
+                if (change.type === "added" || change.type === "modified") {
+                    // Preload the image and draw it on the canvas
+                    const img = new Image();
+                    img.src = pixel.img;
+                    img.onload = () => {
+                        ctx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
+                        // Store the data in our local cache for the tooltip
+                        for (let i = pixel.x; i < pixel.x + pixel.w; i++) {
+                            for (let j = pixel.y; j < pixel.y + pixel.h; j++) {
+                                pixelDataCache.set(`${i},${j}`, pixel);
+                            }
                         }
-                        drawnRects.add(rectKey);
-                    }
-                });
-                updateStats();
-            }
-
-            canvas.addEventListener('mousemove', (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = Math.floor((e.clientX - rect.left) * scaleX);
-                const y = Math.floor((e.clientY - rect.top) * scaleY);
-                const data = pixelData.get(`${x},${y}`);
-                if (data) {
-                    tooltip.style.display = 'block';
-                    tooltipImg.src = data.img;
-                    tooltipTitle.textContent = data.title;
-                    tooltipOwner.textContent = `Owner: ${data.owner}`;
-                    tooltipLink.href = data.link;
-                    tooltipLink.textContent = data.link.length > 30 ? data.link.substring(0, 27) + '...' : data.link;
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    let left = e.clientX + 15;
-                    let top = e.clientY + 15;
-                    if (left + tooltipRect.width > window.innerWidth) left = e.clientX - tooltipRect.width - 15;
-                    if (top + tooltipRect.height > window.innerHeight) top = e.clientY - tooltipRect.height - 15;
-                    tooltip.style.left = `${left}px`;
-                    tooltip.style.top = `${top}px`;
-                    tooltip.style.opacity = 1;
-                } else {
-                    tooltip.style.opacity = 0;
-                    setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+                        updateStats(); // Update stats after drawing
+                    };
                 }
+                // Note: 'removed' is not handled in this app.
             });
+        });
 
-            canvas.addEventListener('mouseleave', () => {
+        // --- Event Listeners ---
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = Math.floor((e.clientX - rect.left) * scaleX);
+            const y = Math.floor((e.clientY - rect.top) * scaleY);
+            const data = pixelDataCache.get(`${x},${y}`);
+
+            if (data) {
+                const tooltipImg = document.getElementById('tooltip-img');
+                const tooltipTitle = document.getElementById('tooltip-title');
+                const tooltipOwner = document.getElementById('tooltip-owner');
+                const tooltipLink = document.getElementById('tooltip-link');
+                
+                tooltip.style.display = 'block';
+                tooltipImg.src = data.img;
+                tooltipTitle.textContent = data.title;
+                tooltipOwner.textContent = `Owner: ${data.owner}`;
+                tooltipLink.href = data.link;
+                tooltipLink.textContent = data.link.length > 30 ? data.link.substring(0, 27) + '...' : data.link;
+                
+                const tooltipRect = tooltip.getBoundingClientRect();
+                let left = e.clientX + 15;
+                let top = e.clientY + 15;
+                if (left + tooltipRect.width > window.innerWidth) left = e.clientX - tooltipRect.width - 15;
+                if (top + tooltipRect.height > window.innerHeight) top = e.clientY - tooltipRect.height - 15;
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.style.opacity = 1;
+            } else {
                 tooltip.style.opacity = 0;
                 setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-            });
-            
-            canvas.addEventListener('click', (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = Math.floor(((e.clientX - rect.left) * scaleX) / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-                const y = Math.floor(((e.clientY - rect.top) * scaleY) / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-                
-                document.getElementById('pixels-coords').value = `X: ${x}, Y: ${y} (10x10 block)`;
-                openModal();
-            });
-
-            function openModal() {
-                modal.classList.remove('hidden');
-                setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
             }
-
-            buyButton.addEventListener('click', openModal);
-
-            closeModalButton.addEventListener('click', () => {
-                modal.querySelector('div').classList.add('scale-95');
-                setTimeout(() => modal.classList.add('hidden'), 300);
-            });
-            
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModalButton.click();
-            });
-
-            function updateStats() {
-                const soldCount = pixelData.size;
-                const totalPixels = GRID_SIZE * GRID_SIZE;
-                document.getElementById('pixels-sold').textContent = soldCount.toLocaleString();
-                document.getElementById('pixels-remaining').textContent = (totalPixels - soldCount).toLocaleString();
-            }
-
-            // --- Custom Message Box ---
-            function showMessage(text, type = 'info') {
-                const container = document.getElementById('message-container');
-                const messageDiv = document.createElement('div');
-                const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
-                const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
-                
-                messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
-                messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
-                
-                container.appendChild(messageDiv);
-
-                setTimeout(() => {
-                    messageDiv.classList.remove('translate-x-full', 'opacity-0');
-                }, 10);
-
-                setTimeout(() => {
-                    messageDiv.classList.add('translate-x-full', 'opacity-0');
-                    setTimeout(() => messageDiv.remove(), 300);
-                }, 4000);
-            }
-
-            // --- PayPal Integration ---
-            try {
-                paypal.Buttons({
-                    onClick: (data, actions) => {
-                        const coordsStr = document.getElementById('pixels-coords').value;
-                        const imageUrl = document.getElementById('image-url').value;
-                        const linkUrl = document.getElementById('link-url').value;
-                        const title = document.getElementById('title').value;
-                        
-                        if (!coordsStr || !imageUrl || !linkUrl || !title) {
-                            showMessage('Please fill out all fields and select a pixel block.', 'error');
-                            return actions.reject();
-                        }
-                        
-                        const coordsMatch = coordsStr.match(/X: (\d+), Y: (\d+)/);
-                        const x = parseInt(coordsMatch[1]);
-                        const y = parseInt(coordsMatch[2]);
-                        let isTaken = false;
-                        for (let i = x; i < x + PIXEL_BLOCK_SIZE; i++) {
-                            for (let j = y; j < y + PIXEL_BLOCK_SIZE; j++) {
-                                if (pixelData.has(`${i},${j}`)) { isTaken = true; break; }
-                            }
-                            if(isTaken) break;
-                        }
-
-                        if(isTaken) {
-                            showMessage('This space is already taken. Please select another.', 'error');
-                            return actions.reject();
-                        }
-                        return actions.resolve();
-                    },
-                    createOrder: (data, actions) => {
-                        return actions.order.create({
-                            purchase_units: [{
-                                description: '10x10 Pixel Block on The Million Dollar Billboard',
-                                amount: { value: PRICE_PER_BLOCK.toFixed(2) }
-                            }]
-                        });
-                    },
-                    onApprove: (data, actions) => {
-                        return actions.order.capture().then(details => {
-                            const coordsStr = document.getElementById('pixels-coords').value;
-                            const coordsMatch = coordsStr.match(/X: (\d+), Y: (\d+)/);
-                            const x = parseInt(coordsMatch[1]);
-                            const y = parseInt(coordsMatch[2]);
-                            
-                            const newData = {
-                                x, y, w: PIXEL_BLOCK_SIZE, h: PIXEL_BLOCK_SIZE,
-                                title: document.getElementById('title').value,
-                                owner: details.payer.name.given_name,
-                                link: document.getElementById('link-url').value,
-                                img: document.getElementById('image-url').value,
-                                image: new Image()
-                            };
-
-                            newData.image.src = newData.img;
-                            newData.image.onload = () => {
-                                addPixelData(x, y, PIXEL_BLOCK_SIZE, PIXEL_BLOCK_SIZE, newData);
-                                drawGrid();
-                                closeModalButton.click();
-                                ['pixels-coords', 'image-url', 'link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-                                showMessage('Payment successful! Your pixels are live.', 'success');
-                            };
-                            newData.image.onerror = () => {
-                                showMessage('Payment successful, but image URL is invalid.', 'error');
-                            };
-                        });
-                    },
-                    onError: (err) => {
-                        showMessage('An error occurred with the payment.', 'error');
-                    }
-                }).render('#paypal-button-container');
-            } catch (error) {
-                console.error("Failed to render PayPal buttons", error);
-                document.getElementById('paypal-button-container').innerHTML = `<p class="text-red-500 text-center">Could not load payment options. Please check your PayPal Client ID.</p>`;
-            }
-
-            // Initial Draw
-            drawGrid();
         });
+        
+        canvas.addEventListener('mouseleave', () => {
+            tooltip.style.opacity = 0;
+            setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+        });
+        
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = Math.floor(((e.clientX - rect.left) * scaleX) / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const y = Math.floor(((e.clientY - rect.top) * scaleY) / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            document.getElementById('pixels-coords').value = `X: ${x}, Y: ${y} (10x10 block)`;
+            const modal = document.getElementById('purchase-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
+        });
+
+        document.getElementById('buy-button').addEventListener('click', () => {
+             const modal = document.getElementById('purchase-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
+        });
+
+        document.getElementById('close-modal').addEventListener('click', () => {
+            const modal = document.getElementById('purchase-modal');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        });
+
+        // --- PayPal Integration ---
+        try {
+            paypal.Buttons({
+                onClick: (data, actions) => {
+                    const coordsStr = document.getElementById('pixels-coords').value;
+                    if (!coordsStr || !document.getElementById('image-url').value || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                        showMessage('Please fill out all fields and select a pixel block.', 'error');
+                        return actions.reject();
+                    }
+                    
+                    const coordsMatch = coordsStr.match(/X: (\d+), Y: (\d+)/);
+                    const x = parseInt(coordsMatch[1]);
+                    const y = parseInt(coordsMatch[2]);
+                    
+                    for (let i = x; i < x + PIXEL_BLOCK_SIZE; i++) {
+                        for (let j = y; j < y + PIXEL_BLOCK_SIZE; j++) {
+                            if (pixelDataCache.has(`${i},${j}`)) {
+                                showMessage('This space is already taken. Please select another.', 'error');
+                                return actions.reject();
+                            }
+                        }
+                    }
+                    return actions.resolve();
+                },
+                createOrder: (data, actions) => actions.order.create({
+                    purchase_units: [{
+                        description: '10x10 Pixel Block on The Million Dollar Billboard',
+                        amount: { value: PRICE_PER_BLOCK.toFixed(2) }
+                    }]
+                }),
+                onApprove: (data, actions) => actions.order.capture().then(async (details) => {
+                    const coordsStr = document.getElementById('pixels-coords').value;
+                    const coordsMatch = coordsStr.match(/X: (\d+), Y: (\d+)/);
+                    
+                    const newPixelData = {
+                        x: parseInt(coordsMatch[1]),
+                        y: parseInt(coordsMatch[2]),
+                        w: PIXEL_BLOCK_SIZE,
+                        h: PIXEL_BLOCK_SIZE,
+                        title: document.getElementById('title').value,
+                        owner: details.payer.name.given_name,
+                        link: document.getElementById('link-url').value,
+                        img: document.getElementById('image-url').value,
+                        purchaseDate: new Date().toISOString()
+                    };
+
+                    try {
+                        // Use coordinates as the document ID to prevent duplicates
+                        const docId = `${newPixelData.x}-${newPixelData.y}`;
+                        await setDoc(doc(db, "pixels", docId), newPixelData);
+                        
+                        showMessage('Payment successful! Your pixels are live.', 'success');
+                        document.getElementById('close-modal').click();
+                        ['pixels-coords', 'image-url', 'link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                    } catch (error) {
+                        console.error("Error writing document to Firebase: ", error);
+                        showMessage('Payment successful, but failed to save pixel.', 'error');
+                    }
+                }),
+                onError: (err) => showMessage('An error occurred with the payment.', 'error')
+            }).render('#paypal-button-container');
+        } catch (error) {
+            console.error("Failed to render PayPal buttons", error);
+        }
+
+        // --- Initial Page Load ---
+        drawGridLines();
     </script>
 </body>
 </html>
