@@ -72,12 +72,6 @@
                 <div class="relative w-full aspect-square bg-gray-800 canvas-container">
                     <canvas id="pixel-grid" width="1000" height="1000"></canvas>
                     <canvas id="selection-canvas" width="1000" height="1000"></canvas>
-                    <div id="tooltip" class="hidden absolute bg-black bg-opacity-80 backdrop-blur-sm text-white text-sm rounded-lg p-3 border border-gray-600 shadow-xl pointer-events-none transition-opacity duration-200 z-10">
-                        <img id="tooltip-img" src="" alt="Pixel Image" class="w-16 h-16 rounded-md mb-2 border-2 border-cyan-400 object-cover" onerror="this.src='https://placehold.co/64x64/083344/FFFFFF?text=Error'">
-                        <h3 id="tooltip-title" class="font-bold text-base text-cyan-300"></h3>
-                        <p id="tooltip-owner" class="text-xs text-gray-400"></p>
-                        <a id="tooltip-link" href="#" target="_blank" class="text-xs text-cyan-500 hover:underline break-all"></a>
-                    </div>
                 </div>
             </div>
             <div class="billboard-stand"></div>
@@ -110,9 +104,15 @@
                 <p class="text-2xl font-bold text-cyan-400 mt-1">Total: $<span id="total-price">0.00</span></p>
             </div>
             <div id="purchase-details">
-                 <div class="mb-4">
-                    <label for="image-url" class="block text-sm font-medium text-gray-300 mb-1">Image URL</label>
-                    <input type="url" id="image-url" name="image-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="https://example.com/image.png">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Upload Your Image</label>
+                    <div class="flex items-center space-x-4">
+                        <img id="image-preview" src="https://placehold.co/80x80/1F2937/4B5563?text=Preview" class="w-20 h-20 rounded-md object-cover border-2 border-gray-600">
+                        <label for="image-upload" class="cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Choose File
+                        </label>
+                        <input type="file" id="image-upload" class="hidden" accept="image/png, image/jpeg, image/gif">
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label for="link-url" class="block text-sm font-medium text-gray-300 mb-1">Link URL</label>
@@ -136,6 +136,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // --- PASTE YOUR FIREBASE CONFIG OBJECT HERE ---
         const firebaseConfig = {
@@ -149,22 +150,22 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         const pixelGridCanvas = document.getElementById('pixel-grid');
         const gridCtx = pixelGridCanvas.getContext('2d');
         const selectionCanvas = document.getElementById('selection-canvas');
         const selectionCtx = selectionCanvas.getContext('2d');
-        const tooltip = document.getElementById('tooltip');
         
         const GRID_SIZE = 1000;
         const PIXEL_BLOCK_SIZE = 10;
-        // *** BUG FIX: Corrected price per block to equal $1 per pixel ***
         const PRICE_PER_BLOCK = 100.00; 
         
         const pixelDataCache = new Map();
         let isDragging = false;
         let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
         let startCoords = { x: 0, y: 0 };
+        let selectedFile = null;
 
         function drawGridLines() {
             gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
@@ -203,6 +204,7 @@
                 const pixel = change.doc.data();
                 if (change.type === "added" || change.type === "modified") {
                     const img = new Image();
+                    img.crossOrigin = "Anonymous"; // Required for canvas to load images from storage
                     img.src = pixel.img;
                     img.onload = () => {
                         gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
@@ -239,10 +241,9 @@
 
         function handleDragMove(e) {
             if (isDragging && e.type.startsWith('touch')) e.preventDefault();
-            
-            const pos = getEventPos(selectionCanvas, e);
             if (!isDragging) return;
             
+            const pos = getEventPos(selectionCanvas, e);
             const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
             const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
 
@@ -281,6 +282,17 @@
             modal.classList.remove('hidden');
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
         }
+        
+        document.getElementById('image-upload').addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                selectedFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('image-preview').src = event.target.result;
+                }
+                reader.readAsDataURL(selectedFile);
+            }
+        });
 
         selectionCanvas.addEventListener('mousedown', handleDragStart);
         selectionCanvas.addEventListener('mousemove', handleDragMove);
@@ -302,8 +314,8 @@
         try {
             paypal.Buttons({
                 onClick: (data, actions) => {
-                    if (!document.getElementById('image-url').value || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-                        showMessage('Please fill out all fields.', 'error');
+                    if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                        showMessage('Please fill out all fields and upload an image.', 'error');
                         return actions.reject();
                     }
                     for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
@@ -326,23 +338,38 @@
                     });
                 },
                 onApprove: (data, actions) => actions.order.capture().then(async (details) => {
-                    const newPixelData = {
-                        ...selectionRect,
-                        title: document.getElementById('title').value,
-                        owner: details.payer.name.given_name,
-                        link: document.getElementById('link-url').value,
-                        img: document.getElementById('image-url').value,
-                        purchaseDate: new Date().toISOString()
-                    };
+                    showMessage('Payment approved! Uploading image...', 'info');
+                    
+                    const fileName = `pixels/${Date.now()}-${selectedFile.name}`;
+                    const storageRef = ref(storage, fileName);
+
                     try {
+                        const snapshot = await uploadBytes(storageRef, selectedFile);
+                        const downloadURL = await getDownloadURL(snapshot.ref);
+
+                        const newPixelData = {
+                            ...selectionRect,
+                            title: document.getElementById('title').value,
+                            owner: details.payer.name.given_name,
+                            link: document.getElementById('link-url').value,
+                            img: downloadURL,
+                            purchaseDate: new Date().toISOString()
+                        };
+
                         const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
                         await setDoc(doc(db, "pixels", docId), newPixelData);
-                        showMessage('Payment successful! Your pixels are live.', 'success');
+                        
+                        showMessage('Upload complete! Your pixels are live.', 'success');
                         document.getElementById('close-modal').click();
-                        ['image-url', 'link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                        // Reset form
+                        document.getElementById('image-upload').value = '';
+                        document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
+                        ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                        selectedFile = null;
+
                     } catch (error) {
-                        console.error("Error writing to Firebase: ", error);
-                        showMessage('Payment successful, but failed to save pixel.', 'error');
+                        console.error("Error during upload or save: ", error);
+                        showMessage('Payment successful, but the upload failed.', 'error');
                     }
                 }),
                 onError: (err) => showMessage('An error occurred with the payment.', 'error')
