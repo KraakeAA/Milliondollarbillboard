@@ -302,10 +302,25 @@
         function handleDragEnd() {
             if (!isDragging) return;
             isDragging = false;
+            
             if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
                 selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
                 return;
             }
+
+            // *** BUG FIX: Check for overlap BEFORE opening the modal ***
+            for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
+                for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
+                    if (pixelDataCache.has(`${i},${j}`)) {
+                        showMessage('Selection overlaps with an owned area.', 'error');
+                        selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                        selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+                        setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
+                        return; // Stop execution
+                    }
+                }
+            }
+
             const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
             const totalPriceUsd = numBlocks * PRICE_PER_BLOCK_USD;
             totalPriceGbp = totalPriceUsd * usdToGbpRate;
@@ -423,6 +438,7 @@
                             showMessage('Please fill out all fields and upload an image.', 'error');
                             return actions.reject();
                         }
+                        // This check is now redundant but kept as a failsafe
                         for (let i = selectionRect.x; i < selectionRect.x + selectionRect.w; i++) {
                             for (let j = selectionRect.y; j < selectionRect.y + selectionRect.h; j++) {
                                 if (pixelDataCache.has(`${i},${j}`)) {
