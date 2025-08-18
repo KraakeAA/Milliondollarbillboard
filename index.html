@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Million Dollar Billboard - Buy Pixel Ad Space!</title>
+    <style>
+        body {
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); /* Sky-like background for outdoor billboard feel */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+
+        header {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin: 0;
+        }
+
+        header p {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+
+        .billboard {
+            perspective: 2000px; /* Creates 3D depth effect */
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .board {
+            width: 1000px;
+            height: 1000px;
+            background: white; /* Base for pixel grid */
+            border: 20px solid #808080; /* Thick metal frame for billboard */
+            border-radius: 5px;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5); /* Shadow for elevation */
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateY(-5deg) rotateX(5deg); /* Slight tilt for 3D "wrapped" billboard look */
+            background-image: 
+                repeating-linear-gradient(0deg, transparent 0, transparent 9px, #ddd 10px),
+                repeating-linear-gradient(90deg, transparent 0, transparent 9px, #ddd 10px); /* Pixel grid lines */
+            background-size: 10px 10px; /* 10x10 pixel blocks */
+            transition: transform 0.3s ease;
+        }
+
+        .board:hover {
+            transform: rotateY(-3deg) rotateX(3deg); /* Subtle hover interaction for depth */
+        }
+
+        /* Billboard supports/poles */
+        .board::before {
+            content: '';
+            position: absolute;
+            bottom: -100px;
+            left: 200px;
+            width: 30px;
+            height: 100px;
+            background: linear-gradient(to bottom, #808080, #A9A9A9); /* Metal pole gradient */
+            transform: translateZ(-50px); /* Push back in 3D space */
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .board::after {
+            content: '';
+            position: absolute;
+            bottom: -100px;
+            right: 200px;
+            width: 30px;
+            height: 100px;
+            background: linear-gradient(to bottom, #808080, #A9A9A9);
+            transform: translateZ(-50px);
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Ad blocks (absolute positioned within the board) */
+        .ad {
+            position: absolute;
+            overflow: hidden;
+            transition: transform 0.2s ease;
+        }
+
+        .ad:hover {
+            transform: scale(1.1); /* Zoom on hover */
+            z-index: 10;
+        }
+
+        .ad img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Responsive scaling */
+        @media (max-width: 1100px) {
+            .board {
+                width: 800px;
+                height: 800px;
+            }
+        }
+
+        footer {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>The Million Dollar Billboard</h1>
+        <p>Buy ad space on this digital billboard! $1 per pixel (minimum 10x10 block for $100). Own a piece of internet history.</p>
+        <a href="mailto:your@email.com?subject=Buy Ad Space">Contact to Buy</a> <!-- Replace with your form/payment link -->
+    </header>
+
+    <div class="billboard">
+        <div class="board">
+            <!-- Example Ad 1: 100x100 block at position (0,0) -->
+            <a href="https://example.com" class="ad" style="left: 0; top: 0; width: 100px; height: 100px;">
+                <img src="ad1.png" alt="Ad 1"> <!-- Upload your ad image -->
+            </a>
+
+            <!-- Example Ad 2: 200x100 block at position (100,100) -->
+            <a href="https://another.com" class="ad" style="left: 100px; top: 100px; width: 200px; height: 100px;">
+                <img src="ad2.png" alt="Ad 2">
+            </a>
+
+            <!-- Add more ads here as you sell them, e.g.:
+            <a href="link" class="ad" style="left: 300px; top: 200px; width: 100px; height: 100px;">
+                <img src="ad3.png" alt="Ad 3">
+            </a> -->
+        </div>
+    </div>
+
+    <footer>
+        Copyright © 2025 The Million Dollar Billboard. All rights reserved.
+    </footer>
+</body>
+</html>
