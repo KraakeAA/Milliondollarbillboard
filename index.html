@@ -382,6 +382,7 @@
             }, 300);
         });
 
+        // *** BUG FIX: Stretch image to fill the entire selection ***
         function processImageForUpload(file, targetWidth, targetHeight) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -394,17 +395,8 @@
                         tempCanvas.width = targetWidth;
                         tempCanvas.height = targetHeight;
                         const tempCtx = tempCanvas.getContext('2d');
-                        const sourceRatio = img.width / img.height;
-                        const targetRatio = targetWidth / targetHeight;
-                        let drawX = 0, drawY = 0, drawWidth = targetWidth, drawHeight = targetHeight;
-                        if (sourceRatio > targetRatio) {
-                            drawHeight = targetWidth / sourceRatio;
-                            drawY = (targetHeight - drawHeight) / 2;
-                        } else {
-                            drawWidth = targetHeight * sourceRatio;
-                            drawX = (targetWidth - drawWidth) / 2;
-                        }
-                        tempCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                        // Stretch the image to fill the canvas completely
+                        tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
                         tempCanvas.toBlob((blob) => {
                             if (blob) resolve(blob);
                             else reject(new Error('Canvas to Blob conversion failed'));
