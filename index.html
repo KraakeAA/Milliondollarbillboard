@@ -138,7 +138,6 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        // --- PASTE YOUR FIREBASE CONFIG OBJECT HERE ---
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -204,7 +203,7 @@
                 const pixel = change.doc.data();
                 if (change.type === "added" || change.type === "modified") {
                     const img = new Image();
-                    img.crossOrigin = "Anonymous"; // Required for canvas to load images from storage
+                    img.crossOrigin = "Anonymous";
                     img.src = pixel.img;
                     img.onload = () => {
                         gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
@@ -225,10 +224,7 @@
             const scaleY = canvas.height / rect.height;
             const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
             const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
         function handleDragStart(e) {
@@ -242,19 +238,15 @@
         function handleDragMove(e) {
             if (isDragging && e.type.startsWith('touch')) e.preventDefault();
             if (!isDragging) return;
-            
             const pos = getEventPos(selectionCanvas, e);
             const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
             const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
-
             const currentX = Math.floor(clampedX / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
             const currentY = Math.floor(clampedY / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-
             selectionRect.x = Math.min(startCoords.x, currentX);
             selectionRect.y = Math.min(startCoords.y, currentY);
             selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
             selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
-            
             selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
             selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
             selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
@@ -266,23 +258,19 @@
         function handleDragEnd() {
             if (!isDragging) return;
             isDragging = false;
-
             if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
                 selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
                 return;
             }
-            
             const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
             const totalPrice = numBlocks * PRICE_PER_BLOCK;
-
             document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
             document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
             const modal = document.getElementById('purchase-modal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
         }
-        
+
         document.getElementById('image-upload').addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
@@ -311,6 +299,47 @@
             }, 300);
         });
 
+        // *** NEW: Image processing function ***
+        function processImageForUpload(file, targetWidth, targetHeight) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = targetWidth;
+                        tempCanvas.height = targetHeight;
+                        const tempCtx = tempCanvas.getContext('2d');
+
+                        const sourceRatio = img.width / img.height;
+                        const targetRatio = targetWidth / targetHeight;
+                        let drawX = 0, drawY = 0, drawWidth = targetWidth, drawHeight = targetHeight;
+
+                        if (sourceRatio > targetRatio) { // Image is wider than target
+                            drawHeight = targetWidth / sourceRatio;
+                            drawY = (targetHeight - drawHeight) / 2;
+                        } else { // Image is taller than target
+                            drawWidth = targetHeight * sourceRatio;
+                            drawX = (targetWidth - drawWidth) / 2;
+                        }
+                        
+                        tempCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                        tempCanvas.toBlob((blob) => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(new Error('Canvas to Blob conversion failed'));
+                            }
+                        }, 'image/png');
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
+        }
+
         try {
             paypal.Buttons({
                 onClick: (data, actions) => {
@@ -338,13 +367,14 @@
                     });
                 },
                 onApprove: (data, actions) => actions.order.capture().then(async (details) => {
-                    showMessage('Payment approved! Uploading image...', 'info');
+                    showMessage('Payment approved! Processing image...', 'info');
                     
-                    const fileName = `pixels/${Date.now()}-${selectedFile.name}`;
-                    const storageRef = ref(storage, fileName);
-
                     try {
-                        const snapshot = await uploadBytes(storageRef, selectedFile);
+                        const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                        const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                        const storageRef = ref(storage, fileName);
+
+                        const snapshot = await uploadBytes(storageRef, processedImageBlob);
                         const downloadURL = await getDownloadURL(snapshot.ref);
 
                         const newPixelData = {
@@ -369,7 +399,7 @@
 
                     } catch (error) {
                         console.error("Error during upload or save: ", error);
-                        showMessage('Payment successful, but the upload failed.', 'error');
+                        showMessage('Payment successful, but the image processing failed.', 'error');
                     }
                 }),
                 onError: (err) => showMessage('An error occurred with the payment.', 'error')
