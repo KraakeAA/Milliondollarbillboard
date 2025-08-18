@@ -150,9 +150,6 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        // --- Set to 'false' before going live! ---
-        const TEST_MODE = false;
-
         const firebaseConfig = {
             apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
             authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
@@ -233,10 +230,17 @@
 
         const pixelsCollection = collection(db, "pixels");
         const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
+            if (snapshot.empty && !isDataLoaded) {
+                isDataLoaded = true;
+                loadingOverlay.style.display = 'none';
+                selectionCanvas.classList.remove('pointer-events-none');
+                return;
+            }
+
             const initialDocs = snapshot.docChanges().filter(change => change.type === "added");
             let loadedImageCount = 0;
 
-            if (snapshot.empty && !isDataLoaded) {
+            if (initialDocs.length === 0 && !isDataLoaded) {
                 isDataLoaded = true;
                 loadingOverlay.style.display = 'none';
                 selectionCanvas.classList.remove('pointer-events-none');
@@ -305,7 +309,6 @@
                 linkEl.href = data.link;
                 linkEl.textContent = data.link;
                 
-                // *** BUG FIX: Smart tooltip positioning ***
                 const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
                 tooltip.style.display = 'block';
@@ -344,7 +347,7 @@
             selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
         }
 
-        function handleDragEnd(e) {
+        function handleDragEnd() {
             if (!isDragging) return;
             isDragging = false;
             
@@ -390,10 +393,8 @@
             const data = pixelDataCache.get(`${blockX},${blockY}`);
 
             if (data) {
-                // Show tooltip on tap
                 handleDragMove(e);
             } else {
-                // Hide tooltip if tapping empty space
                 tooltip.style.opacity = 0;
                 setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
             }
