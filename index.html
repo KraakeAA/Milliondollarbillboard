@@ -6,7 +6,7 @@
     <title>The Million Dollar Billboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Replace 'YOUR_CLIENT_ID' with your Live PayPal Client ID -->
+    <!-- Your Live PayPal Client ID is now integrated -->
     <script src="https://www.paypal.com/sdk/js?client-id=ATP3i6lIdhX-ot734c4Hg5HCButYu740X7g5H7L3RVmZ4UTbbG-LC8d819AiTpbQFOPxa71ju82KgYZ7&currency=USD"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -299,7 +299,6 @@
             }, 300);
         });
 
-        // *** NEW: Image processing function ***
         function processImageForUpload(file, targetWidth, targetHeight) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -312,26 +311,20 @@
                         tempCanvas.width = targetWidth;
                         tempCanvas.height = targetHeight;
                         const tempCtx = tempCanvas.getContext('2d');
-
                         const sourceRatio = img.width / img.height;
                         const targetRatio = targetWidth / targetHeight;
                         let drawX = 0, drawY = 0, drawWidth = targetWidth, drawHeight = targetHeight;
-
-                        if (sourceRatio > targetRatio) { // Image is wider than target
+                        if (sourceRatio > targetRatio) {
                             drawHeight = targetWidth / sourceRatio;
                             drawY = (targetHeight - drawHeight) / 2;
-                        } else { // Image is taller than target
+                        } else {
                             drawWidth = targetHeight * sourceRatio;
                             drawX = (targetWidth - drawWidth) / 2;
                         }
-                        
                         tempCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
                         tempCanvas.toBlob((blob) => {
-                            if (blob) {
-                                resolve(blob);
-                            } else {
-                                reject(new Error('Canvas to Blob conversion failed'));
-                            }
+                            if (blob) resolve(blob);
+                            else reject(new Error('Canvas to Blob conversion failed'));
                         }, 'image/png');
                     };
                     img.onerror = reject;
@@ -368,15 +361,12 @@
                 },
                 onApprove: (data, actions) => actions.order.capture().then(async (details) => {
                     showMessage('Payment approved! Processing image...', 'info');
-                    
                     try {
                         const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
                         const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
                         const storageRef = ref(storage, fileName);
-
                         const snapshot = await uploadBytes(storageRef, processedImageBlob);
                         const downloadURL = await getDownloadURL(snapshot.ref);
-
                         const newPixelData = {
                             ...selectionRect,
                             title: document.getElementById('title').value,
@@ -385,18 +375,14 @@
                             img: downloadURL,
                             purchaseDate: new Date().toISOString()
                         };
-
                         const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
                         await setDoc(doc(db, "pixels", docId), newPixelData);
-                        
                         showMessage('Upload complete! Your pixels are live.', 'success');
                         document.getElementById('close-modal').click();
-                        // Reset form
                         document.getElementById('image-upload').value = '';
                         document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
                         ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
                         selectedFile = null;
-
                     } catch (error) {
                         console.error("Error during upload or save: ", error);
                         showMessage('Payment successful, but the image processing failed.', 'error');
