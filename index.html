@@ -234,7 +234,8 @@
 
         const pixelsCollection = collection(db, "pixels");
         const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
-            soldPixels.length = 0; 
+            soldPixels.length = 0;
+            pixelDataCache.clear();
             snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
 
             gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
