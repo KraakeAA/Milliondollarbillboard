@@ -48,10 +48,6 @@
             cursor: crosshair;
             z-index: 5;
         }
-        #debug-canvas {
-            z-index: 2;
-            pointer-events: none;
-        }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1a1a1a; }
         ::-webkit-scrollbar-thumb { background: #0891b2; border-radius: 4px; }
@@ -75,11 +71,17 @@
                 <div class="billboard-spotlight"></div>
                 <div class="relative w-full aspect-square bg-gray-800 canvas-container">
                     <canvas id="pixel-grid" width="1000" height="1000"></canvas>
-                    <canvas id="debug-canvas" width="1000" height="1000"></canvas>
                     <canvas id="selection-canvas" width="1000" height="1000" class="pointer-events-none"></canvas>
                     <!-- Loading Overlay -->
                     <div id="loading-overlay" class="absolute inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center z-10">
                         <p class="text-white text-xl animate-pulse">Loading Billboard...</p>
+                    </div>
+                    <!-- Tooltip for pixel info -->
+                    <div id="tooltip" class="hidden fixed bg-black bg-opacity-80 backdrop-blur-sm text-white text-sm rounded-lg p-3 border border-gray-600 shadow-xl pointer-events-none transition-opacity duration-200 z-20">
+                        <img id="tooltip-img" src="" alt="Pixel Image" class="w-16 h-16 rounded-md mb-2 border-2 border-cyan-400 object-cover" onerror="this.src='https://placehold.co/64x64/083344/FFFFFF?text=Error'">
+                        <h3 id="tooltip-title" class="font-bold text-base text-cyan-300"></h3>
+                        <p id="tooltip-owner" class="text-xs text-gray-400"></p>
+                        <a id="tooltip-link" href="#" target="_blank" class="text-xs text-cyan-500 hover:underline break-all"></a>
                     </div>
                 </div>
             </div>
@@ -148,9 +150,6 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        const TEST_MODE = true;
-        const DEBUG_MODE = true; 
-
         const firebaseConfig = {
             apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
             authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
@@ -168,9 +167,8 @@
         const gridCtx = pixelGridCanvas.getContext('2d');
         const selectionCanvas = document.getElementById('selection-canvas');
         const selectionCtx = selectionCanvas.getContext('2d');
-        const debugCanvas = document.getElementById('debug-canvas');
-        const debugCtx = debugCanvas.getContext('2d');
         const loadingOverlay = document.getElementById('loading-overlay');
+        const tooltip = document.getElementById('tooltip');
         
         const GRID_SIZE = 1000;
         const PIXEL_BLOCK_SIZE = 10;
@@ -181,6 +179,7 @@
         let isDataLoaded = false;
 
         const soldPixels = [];
+        const pixelDataCache = new Map();
         let isDragging = false;
         let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
         let startCoords = { x: 0, y: 0 };
@@ -231,52 +230,47 @@
 
         const pixelsCollection = collection(db, "pixels");
         const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
-            const initialDocs = snapshot.docChanges().filter(change => change.type === "added");
-            let loadedImageCount = 0;
-            soldPixels.length = 0; // Clear the array before repopulating
+            soldPixels.length = 0; 
+            snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
 
-            if (snapshot.empty && !isDataLoaded) {
-                isDataLoaded = true;
-                loadingOverlay.style.display = 'none';
-                selectionCanvas.classList.remove('pointer-events-none');
+            gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            drawGridLines();
+            
+            let imagesToLoad = snapshot.docs.length;
+
+            if (imagesToLoad === 0) {
+                if (!isDataLoaded) {
+                    isDataLoaded = true;
+                    loadingOverlay.style.display = 'none';
+                    selectionCanvas.classList.remove('pointer-events-none');
+                }
+                updateStats();
                 return;
             }
 
             snapshot.docs.forEach(doc => {
-                soldPixels.push(doc.data());
-            });
-
-            snapshot.docChanges().forEach((change) => {
-                const pixel = change.doc.data();
-                if (change.type === "added" || change.type === "modified") {
-                    const img = new Image();
-                    img.crossOrigin = "Anonymous";
-                    img.src = pixel.img;
-                    img.onload = () => {
-                        gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
-                        updateStats();
-                        if (DEBUG_MODE) drawDebugOverlay();
-
-                        if (!isDataLoaded && change.type === "added") {
-                            loadedImageCount++;
-                            if (loadedImageCount === snapshot.docs.length) {
-                                isDataLoaded = true;
-                                loadingOverlay.style.display = 'none';
-                                selectionCanvas.classList.remove('pointer-events-none');
-                            }
+                const pixel = doc.data();
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.src = pixel.img;
+                img.onload = () => {
+                    gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
+                    for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
+                        for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
+                            pixelDataCache.set(`${i},${j}`, pixel);
                         }
-                    };
-                }
+                    }
+                    
+                    imagesToLoad--;
+                    if (imagesToLoad === 0 && !isDataLoaded) {
+                        isDataLoaded = true;
+                        loadingOverlay.style.display = 'none';
+                        selectionCanvas.classList.remove('pointer-events-none');
+                    }
+                };
             });
+            updateStats();
         });
-
-        function drawDebugOverlay() {
-            debugCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            debugCtx.fillStyle = 'rgba(255, 0, 0, 0.2)';
-            soldPixels.forEach(p => {
-                debugCtx.fillRect(p.x, p.y, p.w, p.h);
-            });
-        }
 
         function getEventPos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
@@ -297,12 +291,46 @@
 
         function handleDragMove(e) {
             if (isDragging && e.type.startsWith('touch')) e.preventDefault();
-            if (!isDragging) return;
+            
             const pos = getEventPos(selectionCanvas, e);
-            const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
-            const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
-            const currentX = Math.floor(clampedX / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const currentY = Math.floor(clampedY / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const data = pixelDataCache.get(`${blockX},${blockY}`);
+
+            if (data && !isDragging) {
+                document.getElementById('tooltip-img').src = data.img;
+                document.getElementById('tooltip-title').textContent = data.title;
+                document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
+                const linkEl = document.getElementById('tooltip-link');
+                linkEl.href = data.link;
+                linkEl.textContent = data.link;
+                
+                const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+                tooltip.style.display = 'block';
+                const tooltipRect = tooltip.getBoundingClientRect();
+                let left = clientX + 15;
+                let top = clientY + 15;
+
+                if (left + tooltipRect.width > window.innerWidth) {
+                    left = clientX - tooltipRect.width - 15;
+                }
+                if (top + tooltipRect.height > window.innerHeight) {
+                    top = clientY - tooltipRect.height - 15;
+                }
+                
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.style.opacity = 1;
+            } else {
+                tooltip.style.opacity = 0;
+                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+            }
+
+            if (!isDragging) return;
+
+            const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
             selectionRect.x = Math.min(startCoords.x, currentX);
             selectionRect.y = Math.min(startCoords.y, currentY);
             selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
@@ -324,7 +352,6 @@
                 return;
             }
 
-            // *** BUG FIX: Use precise rectangle intersection check ***
             for (const soldPixel of soldPixels) {
                 const rectA = selectionRect;
                 const rectB = soldPixel;
@@ -355,6 +382,21 @@
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
         }
 
+        function handleClick(e) {
+            if (isDragging) return;
+            const pos = getEventPos(selectionCanvas, e);
+            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const data = pixelDataCache.get(`${blockX},${blockY}`);
+
+            if (data) {
+                handleDragMove(e);
+            } else {
+                tooltip.style.opacity = 0;
+                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+            }
+        }
+
         document.getElementById('image-upload').addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
@@ -369,10 +411,15 @@
         selectionCanvas.addEventListener('mousedown', handleDragStart);
         selectionCanvas.addEventListener('mousemove', handleDragMove);
         selectionCanvas.addEventListener('mouseup', handleDragEnd);
-        selectionCanvas.addEventListener('mouseleave', () => { if (isDragging) handleDragEnd(); });
+        selectionCanvas.addEventListener('mouseleave', () => { 
+            if (isDragging) handleDragEnd();
+            tooltip.style.opacity = 0;
+            setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+        });
         selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
         selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
         selectionCanvas.addEventListener('touchend', handleDragEnd);
+        selectionCanvas.addEventListener('click', handleClick);
         
         document.getElementById('close-modal').addEventListener('click', () => {
             const modal = document.getElementById('purchase-modal');
@@ -407,7 +454,7 @@
             });
         }
 
-        async function handlePurchase(ownerName = 'Test User') {
+        async function handlePurchase(ownerName) {
             showMessage('Processing image...', 'info');
             try {
                 const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
@@ -466,20 +513,6 @@
             } catch (error) {
                 console.error("Failed to render PayPal buttons", error);
             }
-        }
-
-        if (TEST_MODE) {
-            const testButton = document.createElement('button');
-            testButton.textContent = 'Test Upload (No Payment)';
-            testButton.className = 'w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg transition-colors';
-            testButton.onclick = () => {
-                if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-                    showMessage('Please fill out all fields and upload an image.', 'error');
-                    return;
-                }
-                handlePurchase();
-            };
-            document.getElementById('paypal-button-container').after(testButton);
         }
 
         fetchExchangeRate();
