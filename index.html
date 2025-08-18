@@ -72,6 +72,13 @@
                 <div class="relative w-full aspect-square bg-gray-800 canvas-container">
                     <canvas id="pixel-grid" width="1000" height="1000"></canvas>
                     <canvas id="selection-canvas" width="1000" height="1000"></canvas>
+                    <!-- BUG FIX: Re-added the tooltip element -->
+                    <div id="tooltip" class="hidden absolute bg-black bg-opacity-80 backdrop-blur-sm text-white text-sm rounded-lg p-3 border border-gray-600 shadow-xl pointer-events-none transition-opacity duration-200 z-10">
+                        <img id="tooltip-img" src="" alt="Pixel Image" class="w-16 h-16 rounded-md mb-2 border-2 border-cyan-400 object-cover" onerror="this.src='https://placehold.co/64x64/083344/FFFFFF?text=Error'">
+                        <h3 id="tooltip-title" class="font-bold text-base text-cyan-300"></h3>
+                        <p id="tooltip-owner" class="text-xs text-gray-400"></p>
+                        <a id="tooltip-link" href="#" target="_blank" class="text-xs text-cyan-500 hover:underline break-all"></a>
+                    </div>
                 </div>
             </div>
             <div class="billboard-stand"></div>
@@ -140,15 +147,13 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        // --- IMPORTANT: Set to 'false' before going live! ---
         const TEST_MODE = true;
 
-        // Your web app's Firebase configuration with CORRECTED storageBucket
         const firebaseConfig = {
             apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
             authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
             projectId: "themilliondollarbillboar-d003e",
-            storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app", // CORRECTED
+            storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
             messagingSenderId: "980560213272",
             appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
         };
@@ -161,6 +166,7 @@
         const gridCtx = pixelGridCanvas.getContext('2d');
         const selectionCanvas = document.getElementById('selection-canvas');
         const selectionCtx = selectionCanvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
         
         const GRID_SIZE = 1000;
         const PIXEL_BLOCK_SIZE = 10;
@@ -258,31 +264,61 @@
 
         function handleDragMove(e) {
             if (isDragging && e.type.startsWith('touch')) e.preventDefault();
-            if (!isDragging) return;
+            
             const pos = getEventPos(selectionCanvas, e);
-            const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
-            const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
-            const currentX = Math.floor(clampedX / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const currentY = Math.floor(clampedY / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            selectionRect.x = Math.min(startCoords.x, currentX);
-            selectionRect.y = Math.min(startCoords.y, currentY);
-            selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
-            selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
-            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-            selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-            selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
-            selectionCtx.lineWidth = 2;
-            selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            if (isDragging) {
+                const clampedX = Math.max(0, Math.min(pos.x, GRID_SIZE - 1));
+                const clampedY = Math.max(0, Math.min(pos.y, GRID_SIZE - 1));
+                const currentX = Math.floor(clampedX / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+                const currentY = Math.floor(clampedY / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+                selectionRect.x = Math.min(startCoords.x, currentX);
+                selectionRect.y = Math.min(startCoords.y, currentY);
+                selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
+                selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
+                selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+                selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+                selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+                selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                selectionCtx.lineWidth = 2;
+                selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            } else {
+                // Tooltip logic
+                const data = pixelDataCache.get(`${Math.floor(pos.x)},${Math.floor(pos.y)}`);
+                if (data) {
+                    tooltip.style.display = 'block';
+                    document.getElementById('tooltip-img').src = data.img;
+                    document.getElementById('tooltip-title').textContent = data.title;
+                    document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
+                    const linkEl = document.getElementById('tooltip-link');
+                    linkEl.href = data.link;
+                    linkEl.textContent = data.link;
+                    
+                    const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+                    tooltip.style.left = `${clientX + 15}px`;
+                    tooltip.style.top = `${clientY + 15}px`;
+                    tooltip.style.opacity = 1;
+                } else {
+                    tooltip.style.opacity = 0;
+                    setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+                }
+            }
         }
 
         function handleDragEnd() {
             if (!isDragging) return;
             isDragging = false;
+
+            // BUG FIX: Differentiate between a click and a drag
             if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
                 selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+                const data = pixelDataCache.get(`${startCoords.x},${startCoords.y}`);
+                if (data && data.link) {
+                    window.open(data.link, '_blank');
+                }
                 return;
             }
+            
             const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
             const totalPriceUsd = numBlocks * PRICE_PER_BLOCK_USD;
             totalPriceGbp = totalPriceUsd * usdToGbpRate;
