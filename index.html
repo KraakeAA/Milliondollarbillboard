@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en-GB">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Million Dollar Billboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- PayPal SDK configured for GBP -->
-    <script src="https://www.paypal.com/sdk/js?client-id=ATP3i6lIdhX-ot734c4Hg5HCButYu740X7g5H7L3RVmZ4UTbbG-LC8d819AiTpbQFOPxa71ju82KgYZ7&currency=GBP"></script>
+    <!-- PayPal SDK configured for USD -->
+    <script src="https://www.paypal.com/sdk/js?client-id=ATP3i6lIdhX-ot734c4Hg5HCButYu740X7g5H7L3RVmZ4UTbbG-LC8d819AiTpbQFOPxa71ju82KgYZ7&currency=USD"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -80,7 +80,7 @@
         <div class="flex flex-col md:flex-row justify-around items-center bg-gray-900 bg-opacity-70 rounded-xl p-6 mb-8 border border-gray-700 max-w-4xl mx-auto">
             <div class="text-center md:text-left mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Pricing</p>
-                <p class="text-3xl font-bold text-white">£100 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
+                <p class="text-3xl font-bold text-white">$100 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
             </div>
             <div class="text-center mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Pixels Sold</p>
@@ -101,13 +101,13 @@
             </div>
             <div class="bg-gray-800 p-4 rounded-lg mb-4 text-center">
                 <p class="text-gray-400">You have selected a <span id="selection-size" class="font-bold text-white">0x0</span> pixel block.</p>
-                <p class="text-2xl font-bold text-cyan-400 mt-1">Total: £<span id="total-price">0.00</span></p>
+                <p class="text-2xl font-bold text-cyan-400 mt-1">Total: $<span id="total-price">0.00</span></p>
             </div>
             <div id="purchase-details">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-300 mb-2">Upload Your Image</label>
                     <div class="flex items-center space-x-4">
-                        <img id="image-preview" src="https://placehold.co/80x80/1F2937/4B5563?text=Preview" class="w-20 h-20 rounded-md object-cover border-2 border-gray-600">
+                        <img id="image-preview" src="https://placehold.co/80x80/1F2G937/4B5563?text=Preview" class="w-20 h-20 rounded-md object-cover border-2 border-gray-600">
                         <label for="image-upload" class="cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                             Choose File
                         </label>
@@ -265,7 +265,7 @@
             const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
             const totalPrice = numBlocks * PRICE_PER_BLOCK;
             document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
-            document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const modal = document.getElementById('purchase-modal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
