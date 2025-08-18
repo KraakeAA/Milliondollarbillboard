@@ -207,7 +207,11 @@
         }
         
         function updateStats() {
-            const totalSoldPixels = soldPixels.reduce((acc, p) => acc + (p.w * p.h), 0);
+            const totalSoldPixels = soldPixels.reduce((acc, p) => {
+                const width = p.w || 0;
+                const height = p.h || 0;
+                return acc + (width * height);
+            }, 0);
             const totalPixels = GRID_SIZE * GRID_SIZE;
             document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
             document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
