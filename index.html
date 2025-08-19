@@ -6,8 +6,8 @@
     <title>The Million Dollar Billboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- PayPal SDK configured for GBP Payment -->
-    <script src="https://www.paypal.com/sdk/js?client-id=ATP3i6lIdhX-ot734c4Hg5HCButYu740X7g5H7L3RVmZ4UTbbG-LC8d819AiTpbQFOPxa71ju82KgYZ7&currency=GBP"></script>
+    <!-- Stripe.js SDK -->
+    <script src="https://js.stripe.com/v3/"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,7 +91,7 @@
         <div class="flex flex-col md:flex-row justify-around items-center bg-gray-900 bg-opacity-70 rounded-xl p-6 mb-8 border border-gray-700 max-w-4xl mx-auto">
             <div class="text-center md:text-left mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Pricing</p>
-                <p class="text-3xl font-bold text-white">$0.01 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
+                <p class="text-3xl font-bold text-white">£1.00 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
             </div>
             <div class="text-center mb-4 md:mb-0">
                 <p class="text-sm text-gray-400 uppercase tracking-widest">Pixels Sold</p>
@@ -112,8 +112,7 @@
             </div>
             <div class="bg-gray-800 p-4 rounded-lg mb-4 text-center">
                 <p class="text-gray-400">You have selected a <span id="selection-size" class="font-bold text-white">0x0</span> pixel block.</p>
-                <p class="text-2xl font-bold text-cyan-400 mt-1">Total: $<span id="total-price-usd">0.00</span></p>
-                <p class="text-sm text-gray-500 mt-1">You will be charged approx. <span id="total-price-gbp" class="font-bold">£0.00</span></p>
+                <p class="text-2xl font-bold text-cyan-400 mt-1">Total: £<span id="total-price">0.00</span></p>
             </div>
             <div id="purchase-details">
                 <div class="mb-4">
@@ -135,7 +134,9 @@
                     <input type="text" id="title" name="title" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="Your company name or message">
                 </div>
             </div>
-            <div id="paypal-button-container" class="mt-4"></div>
+            <button id="checkout-button" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg text-lg transition-colors">
+                Pay with Card
+            </button>
         </div>
     </div>
     
@@ -147,7 +148,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -172,10 +173,8 @@
         
         const GRID_SIZE = 1000;
         const PIXEL_BLOCK_SIZE = 10;
-        const PRICE_PER_BLOCK_USD = 0.01; // Test Price
+        const PRICE_PER_BLOCK = 1.00; 
         
-        let usdToGbpRate = 0.80;
-        let totalPriceGbp = 0;
         let isDataLoaded = false;
 
         const soldPixels = [];
@@ -184,18 +183,6 @@
         let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
         let startCoords = { x: 0, y: 0 };
         let selectedFile = null;
-
-        async function fetchExchangeRate() {
-            try {
-                const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const data = await response.json();
-                if (data && data.rates && data.rates.GBP) {
-                    usdToGbpRate = data.rates.GBP;
-                }
-            } catch (error) {
-                console.error("Could not fetch exchange rate, using fallback rate.", error);
-            }
-        }
 
         function drawGridLines() {
             gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
@@ -371,17 +358,9 @@
             }
 
             const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-            const totalPriceUsd = numBlocks * PRICE_PER_BLOCK_USD;
-            totalPriceGbp = totalPriceUsd * usdToGbpRate;
-
             document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
-            document.getElementById('total-price-usd').textContent = totalPriceUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById('total-price-gbp').textContent = `£${totalPriceGbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('total-price').textContent = (numBlocks * PRICE_PER_BLOCK).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             
-            const paypalContainer = document.getElementById('paypal-button-container');
-            paypalContainer.innerHTML = '';
-            renderPayPalButtons();
-
             const modal = document.getElementById('purchase-modal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
@@ -489,39 +468,70 @@
             }
         }
 
-        function renderPayPalButtons() {
+        const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
+        document.getElementById('checkout-button').addEventListener('click', async () => {
+            if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                showMessage('Please fill out all fields and upload an image.', 'error');
+                return;
+            }
+
+            const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+            const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
+            const cancelUrl = window.location.href.split('?')[0];
+
+            showMessage('Preparing your pixels...', 'info');
+
             try {
-                paypal.Buttons({
-                    onClick: (data, actions) => {
-                        if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-                            showMessage('Please fill out all fields and upload an image.', 'error');
-                            return actions.reject();
-                        }
-                        return actions.resolve();
-                    },
-                    createOrder: (data, actions) => {
-                        return actions.order.create({
-                            purchase_units: [{
-                                description: `${selectionRect.w}x${selectionRect.h} Pixels on The Million Dollar Billboard`,
-                                amount: { value: totalPriceGbp.toFixed(2) }
-                            }]
-                        });
-                    },
-                    onApprove: (data, actions) => actions.order.capture().then((details) => {
-                        handlePurchase(details.payer.name.given_name);
-                    }),
-                    onCancel: (data) => {
-                        showMessage('Payment was cancelled.', 'info');
-                    },
-                    onError: (err) => showMessage('An error occurred with the payment.', 'error')
-                }).render('#paypal-button-container');
-            } catch (error) {
-                console.error("Failed to render PayPal buttons", error);
+                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                const storageRef = ref(storage, fileName);
+                const snapshot = await uploadBytes(storageRef, processedImageBlob);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                const tempId = `temp_${Date.now()}`;
+                const tempDocRef = doc(db, "pending_pixels", tempId);
+                await setDoc(tempDocRef, {
+                    ...selectionRect,
+                    title: document.getElementById('title').value,
+                    link: document.getElementById('link-url').value,
+                    img: downloadURL,
+                    purchaseDate: new Date().toISOString()
+                });
+
+                stripe.redirectToCheckout({
+                    lineItems: [{ price: 'price_1RxlK9IpvwwhCV4xAyaFyM8o', quantity: numBlocks }],
+                    mode: 'payment',
+                    successUrl: `${successUrl}&pending_id=${tempId}`,
+                    cancelUrl: cancelUrl,
+                });
+
+            } catch(error) {
+                console.error("Error preparing for checkout: ", error);
+                showMessage('Could not prepare your image for purchase.', 'error');
+            }
+        });
+
+        async function finalizePurchase() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pendingId = urlParams.get('pending_id');
+            if (pendingId) {
+                const tempDocRef = doc(db, "pending_pixels", pendingId);
+                const tempDocSnap = await getDoc(tempDocRef);
+
+                if (tempDocSnap.exists()) {
+                    const pixelData = tempDocSnap.data();
+                    const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
+                    await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' }); // Owner name is not available here
+                    await deleteDoc(tempDocRef);
+                    showMessage('Purchase successful! Your pixels are live.', 'success');
+                }
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
         }
 
-        fetchExchangeRate();
         drawGridLines();
+        finalizePurchase();
     </script>
 </body>
 </html>
