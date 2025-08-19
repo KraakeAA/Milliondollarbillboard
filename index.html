@@ -4,546 +4,507 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Million Dollar Billboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Stripe.js SDK -->
-    <script src="https://js.stripe.com/v3/"></script>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://www.css.gg/css?=|check|info" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link rel="stylesheet" href="https://css.gg/check.css">
+    <link rel="stylesheet" href="https://css.gg/info.css">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a0a;
-            background-image: radial-gradient(circle at 50% 30%, rgba(0, 255, 255, 0.05), rgba(10, 10, 10, 0) 30%);
+        #pixel-grid, #selection-canvas {
+            image-rendering: pixelated;
         }
-        .billboard-frame {
-            background: #1a1a1a; padding: 20px; border-radius: 10px; border: 2px solid #333;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5); position: relative;
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-size: 24px;
         }
-        .billboard-spotlight {
-            position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
-            width: 60%; height: 40px; background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
-            clip-path: polygon(10% 0, 90% 0, 100% 100%, 0% 100%); opacity: 0.5;
+        #tooltip {
+            position: fixed;
+            background: #1F2937;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            display: none;
+            max-width: 300px;
+            font-size: 14px;
         }
-        .billboard-stand {
-            width: 100px; height: 80px; background: #1a1a1a; margin: 0 auto; position: relative;
-            border-left: 2px solid #333; border-right: 2px solid #333; border-bottom: 2px solid #333;
+        #tooltip img {
+            max-width: 100%;
+            height: auto;
         }
-        .billboard-stand::before {
-            content: ''; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
-            width: 150px; height: 20px; background: #111; border-radius: 5px; border: 2px solid #333;
+        #purchase-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
         }
-        .canvas-container canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        #purchase-modal > div {
+            background: #1F2937;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            margin: 10vh auto;
+            transform: scale(0.95);
+            transition: transform 0.3s;
         }
-        #pixel-grid {
-            image-rendering: pixelated; image-rendering: crisp-edges;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
-            z-index: 1;
+        #message-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
         }
-        #selection-canvas {
-            cursor: crosshair;
-            z-index: 5;
+        @media (max-width: 640px) {
+            #purchase-modal > div {
+                margin-top: 5vh;
+            }
         }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1a1a1a; }
-        ::-webkit-scrollbar-thumb { background: #0891b2; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
     </style>
 </head>
-<body class="text-gray-200 overflow-x-hidden">
-
-    <header class="text-center py-8 md:py-12">
-        <h1 class="text-4xl md:text-6xl font-black uppercase tracking-wider text-white">
-            The <span class="text-cyan-400">Million Dollar</span> Billboard
-        </h1>
-        <p class="mt-4 text-lg md:text-xl text-gray-400 max-w-3xl mx-auto px-4">
-            Own a piece of digital real estate. Drag on the billboard to select your space.
-        </p>
-    </header>
-
-    <main class="container mx-auto px-4">
-        <div class="mb-8">
-            <div class="billboard-frame max-w-[1040px] mx-auto">
-                <div class="billboard-spotlight"></div>
-                <div class="relative w-full aspect-square bg-gray-800 canvas-container">
-                    <canvas id="pixel-grid" width="1000" height="1000"></canvas>
-                    <canvas id="selection-canvas" width="1000" height="1000" class="pointer-events-none"></canvas>
-                    <!-- Loading Overlay -->
-                    <div id="loading-overlay" class="absolute inset-0 bg-gray-800 bg-opacity-80 flex items-center justify-center z-10">
-                        <p class="text-white text-xl animate-pulse">Loading Billboard...</p>
-                    </div>
-                    <!-- Tooltip for pixel info -->
-                    <div id="tooltip" class="hidden fixed bg-black bg-opacity-80 backdrop-blur-sm text-white text-sm rounded-lg p-3 border border-gray-600 shadow-xl pointer-events-none transition-opacity duration-200 z-20">
-                        <img id="tooltip-img" src="" alt="Pixel Image" class="w-16 h-16 rounded-md mb-2 border-2 border-cyan-400 object-cover" onerror="this.src='https://placehold.co/64x64/083344/FFFFFF?text=Error'">
-                        <h3 id="tooltip-title" class="font-bold text-base text-cyan-300"></h3>
-                        <p id="tooltip-owner" class="text-xs text-gray-400"></p>
-                        <a id="tooltip-link" href="#" target="_blank" class="text-xs text-cyan-500 hover:underline break-all"></a>
-                    </div>
-                </div>
-            </div>
-            <div class="billboard-stand"></div>
-        </div>
-
-        <div class="flex flex-col md:flex-row justify-around items-center bg-gray-900 bg-opacity-70 rounded-xl p-6 mb-8 border border-gray-700 max-w-4xl mx-auto">
-            <div class="text-center md:text-left mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Pricing</p>
-                <p class="text-3xl font-bold text-white">$100 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
-            </div>
-            <div class="text-center mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Pixels Sold</p>
-                <p id="pixels-sold" class="text-3xl font-bold text-cyan-400">0</p>
-            </div>
-            <div class="text-center mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Remaining</p>
-                <p id="pixels-remaining" class="text-3xl font-bold text-white">1,000,000</p>
-            </div>
-        </div>
-    </main>
-
-    <div id="purchase-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-gray-900 rounded-2xl border border-gray-700 p-8 w-full max-w-md m-4 transform transition-transform duration-300 scale-95">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-white">Purchase Your Pixels</h2>
-                <button id="close-modal" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-lg mb-4 text-center">
-                <p class="text-gray-400">You have selected a <span id="selection-size" class="font-bold text-white">0x0</span> pixel block.</p>
-                <p class="text-2xl font-bold text-cyan-400 mt-1">Total: $<span id="total-price">0.00</span></p>
-            </div>
-            <div id="purchase-details">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Upload Your Image</label>
-                    <div class="flex items-center space-x-4">
-                        <img id="image-preview" src="https://placehold.co/80x80/1F2937/4B5563?text=Preview" class="w-20 h-20 rounded-md object-cover border-2 border-gray-600">
-                        <label for="image-upload" class="cursor-pointer bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Choose File
-                        </label>
-                        <input type="file" id="image-upload" class="hidden" accept="image/png, image/jpeg, image/gif">
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label for="link-url" class="block text-sm font-medium text-gray-300 mb-1">Link URL</label>
-                    <input type="url" id="link-url" name="link-url" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="https://yourwebsite.com">
-                </div>
-                <div class="mb-6">
-                    <label for="title" class="block text-sm font-medium text-gray-300 mb-1">Title / Alt Text</label>
-                    <input type="text" id="title" name="title" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" required placeholder="Your company name or message">
-                </div>
-            </div>
-            <button id="checkout-button" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg text-lg transition-colors">
-                Pay with Card
-            </button>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen">
+    <div id="loading-overlay">Loading Billboard...</div>
+    <canvas id="pixel-grid" width="1000" height="1000" style="border: 1px solid #4B5563; cursor: crosshair;"></canvas>
+    <canvas id="selection-canvas" width="1000" height="1000" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+    <div id="stats" class="mt-4 text-center">
+        <p>Pixels Sold: <span id="pixels-sold">0</span></p>
+        <p>Pixels Remaining: <span id="pixels-remaining">1,000,000</span></p>
+    </div>
+    <div id="selection-info" class="mt-4 text-center hidden">
+        <p>Selection Size: <span id="selection-size">0x0</span></p>
+        <p>Total Price: $<span id="total-price">0.00</span></p>
+    </div>
+    <div id="purchase-modal" class="hidden">
+        <div class="relative">
+            <button id="close-modal" class="absolute top-2 right-2 text-gray-400 hover:text-white">&times;</button>
+            <h2 class="text-xl mb-4">Purchase Pixels</h2>
+            <input type="file" id="image-upload" accept="image/*" class="mb-2 w-full">
+            <img id="image-preview" src="https://placehold.co/80x80/1F2937/4B5563?text=Preview" alt="Preview" class="mb-2 w-full max-h-40 object-contain">
+            <input type="text" id="title" placeholder="Title" class="mb-2 w-full p-2 bg-gray-800 border border-gray-700 rounded">
+            <input type="url" id="link-url" placeholder="Link URL" class="mb-2 w-full p-2 bg-gray-800 border border-gray-700 rounded">
+            <button id="checkout-button" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded mt-2">Pay with Card</button>
         </div>
     </div>
-    
-    <div id="message-container" class="fixed bottom-5 right-5 z-50 flex flex-col items-end space-y-2"></div>
-
-    <footer class="text-center py-6 mt-8 border-t border-gray-800">
-        <p class="text-gray-500">&copy; 2025 The Million Dollar Billboard. All rights reserved.</p>
-    </footer>
-
+    <div id="message-container"></div>
+    <div id="tooltip">
+        <img id="tooltip-img" src="" alt="Pixel Preview">
+        <h3 id="tooltip-title"></h3>
+        <p id="tooltip-owner"></p>
+        <a id="tooltip-link" href="#" target="_blank"></a>
+    </div>
+    <div style="text-align: center; padding: 10px; font-size: 12px; color: #d1d5db;">
+        Celebrating the 20th Anniversary of the Million Dollar Homepage (2005-2025). Inspired by Alex Tew’s pioneering work, we’ve created the Million Dollar Billboard as a modern tribute. This is an independent project and not affiliated with the original Million Dollar Homepage.
+    </div>
     <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
-        authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
-        projectId: "themilliondollarbillboar-d003e",
-        storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
-        messagingSenderId: "980560213272",
-        appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
+            authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
+            projectId: "themilliondollarbillboar-d003e",
+            storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
+            messagingSenderId: "980560213272",
+            appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
+        };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
-    const auth = getAuth(app);
-    signInAnonymously(auth)
-      .then(() => {
-        console.log('Signed in anonymously');
-      })
-      .catch((error) => {
-        console.error('Anonymous auth error:', error);
-      });
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const auth = getAuth(app);
+        signInAnonymously(auth)
+          .then(() => {
+            console.log('Signed in anonymously');
+          })
+          .catch((error) => {
+            console.error('Anonymous auth error:', error);
+          });
 
-    const pixelGridCanvas = document.getElementById('pixel-grid');
-    const gridCtx = pixelGridCanvas.getContext('2d');
-    const selectionCanvas = document.getElementById('selection-canvas');
-    const selectionCtx = selectionCanvas.getContext('2d');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const tooltip = document.getElementById('tooltip');
-    
-    const GRID_SIZE = 1000;
-    const PIXEL_BLOCK_SIZE = 10;
-    const PRICE_PER_BLOCK = 100.00; 
-    
-    let isDataLoaded = false;
-
-    const soldPixels = [];
-    const pixelDataCache = new Map();
-    let isDragging = false;
-    let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
-    let startCoords = { x: 0, y: 0 };
-    let selectedFile = null;
-
-    function drawGridLines() {
-        gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        gridCtx.lineWidth = 1;
-        for (let i = 0; i <= GRID_SIZE; i += PIXEL_BLOCK_SIZE) {
-            gridCtx.beginPath(); gridCtx.moveTo(i, 0); gridCtx.lineTo(i, GRID_SIZE); gridCtx.stroke();
-            gridCtx.beginPath(); gridCtx.moveTo(0, i); gridCtx.lineTo(GRID_SIZE, i); gridCtx.stroke();
-        }
-    }
-    
-    function updateStats() {
-        const totalSoldPixels = soldPixels.reduce((acc, p) => {
-            const width = p.w || 0;
-            const height = p.h || 0;
-            return acc + (width * height);
-        }, 0);
-        const totalPixels = GRID_SIZE * GRID_SIZE;
-        document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
-        document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
-    }
-
-    function showMessage(text, type = 'info') {
-        const container = document.getElementById('message-container');
-        const messageDiv = document.createElement('div');
-        const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
-        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
-        messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
-        messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
-        container.appendChild(messageDiv);
-        setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
-        setTimeout(() => {
-            messageDiv.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => messageDiv.remove(), 300);
-        }, 4000);
-    }
-
-    const pixelsCollection = collection(db, "pixels");
-    const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
-        soldPixels.length = 0;
-        pixelDataCache.clear();
-        snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
-
-        gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-        drawGridLines();
+        const pixelGridCanvas = document.getElementById('pixel-grid');
+        const gridCtx = pixelGridCanvas.getContext('2d');
+        const selectionCanvas = document.getElementById('selection-canvas');
+        const selectionCtx = selectionCanvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const tooltip = document.getElementById('tooltip');
         
-        let imagesToLoad = snapshot.docs.length;
+        const GRID_SIZE = 1000;
+        const PIXEL_BLOCK_SIZE = 10;
+        const PRICE_PER_BLOCK = 100.00; 
+        
+        let isDataLoaded = false;
 
-        if (imagesToLoad === 0) {
-            if (!isDataLoaded) {
-                isDataLoaded = true;
-                loadingOverlay.style.display = 'none';
-                selectionCanvas.classList.remove('pointer-events-none');
+        const soldPixels = [];
+        const pixelDataCache = new Map();
+        let isDragging = false;
+        let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
+        let startCoords = { x: 0, y: 0 };
+        let selectedFile = null;
+
+        function drawGridLines() {
+            gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            gridCtx.lineWidth = 1;
+            for (let i = 0; i <= GRID_SIZE; i += PIXEL_BLOCK_SIZE) {
+                gridCtx.beginPath(); gridCtx.moveTo(i, 0); gridCtx.lineTo(i, GRID_SIZE); gridCtx.stroke();
+                gridCtx.beginPath(); gridCtx.moveTo(0, i); gridCtx.lineTo(GRID_SIZE, i); gridCtx.stroke();
             }
-            updateStats();
-            return;
+        }
+        
+        function updateStats() {
+            const totalSoldPixels = soldPixels.reduce((acc, p) => {
+                const width = p.w || 0;
+                const height = p.h || 0;
+                return acc + (width * height);
+            }, 0);
+            const totalPixels = GRID_SIZE * GRID_SIZE;
+            document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
+            document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
         }
 
-        snapshot.docs.forEach(doc => {
-            const pixel = doc.data();
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = pixel.img;
-            img.onload = () => {
-                gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
-                for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
-                    for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
-                        pixelDataCache.set(`${i},${j}`, pixel);
-                    }
-                }
-                
-                imagesToLoad--;
-                if (imagesToLoad === 0 && !isDataLoaded) {
+        function showMessage(text, type = 'info') {
+            const container = document.getElementById('message-container');
+            const messageDiv = document.createElement('div');
+            const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
+            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+            messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
+            messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
+            container.appendChild(messageDiv);
+            setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
+            setTimeout(() => {
+                messageDiv.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => messageDiv.remove(), 300);
+            }, 4000);
+        }
+
+        const pixelsCollection = collection(db, "pixels");
+        const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
+            soldPixels.length = 0;
+            pixelDataCache.clear();
+            snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
+
+            gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            drawGridLines();
+            
+            let imagesToLoad = snapshot.docs.length;
+
+            if (imagesToLoad === 0) {
+                if (!isDataLoaded) {
                     isDataLoaded = true;
                     loadingOverlay.style.display = 'none';
                     selectionCanvas.classList.remove('pointer-events-none');
                 }
-            };
-        });
-        updateStats();
-    });
-
-    function getEventPos(canvas, evt) {
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
-        const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
-        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
-    }
-
-    function handleDragStart(e) {
-        isDragging = true;
-        const pos = getEventPos(selectionCanvas, e);
-        startCoords.x = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        startCoords.y = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        selectionRect = { x: startCoords.x, y: startCoords.y, w: 0, h: 0 };
-    }
-
-    function handleDragMove(e) {
-        if (isDragging && e.type.startsWith('touch')) e.preventDefault();
-        
-        const pos = getEventPos(selectionCanvas, e);
-        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const data = pixelDataCache.get(`${blockX},${blockY}`);
-
-        if (data && !isDragging) {
-            document.getElementById('tooltip-img').src = data.img;
-            document.getElementById('tooltip-title').textContent = data.title;
-            document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
-            const linkEl = document.getElementById('tooltip-link');
-            linkEl.href = data.link;
-            linkEl.textContent = data.link;
-            
-            const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
-            const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-            tooltip.style.display = 'block';
-            const tooltipRect = tooltip.getBoundingClientRect();
-            let left = clientX + 15;
-            let top = clientY + 15;
-
-            if (left + tooltipRect.width > window.innerWidth) {
-                left = clientX - tooltipRect.width - 15;
-            }
-            if (top + tooltipRect.height > window.innerHeight) {
-                top = clientY - tooltipRect.height - 15;
-            }
-            
-            tooltip.style.left = `${left}px`;
-            tooltip.style.top = `${top}px`;
-            tooltip.style.opacity = 1;
-        } else {
-            tooltip.style.opacity = 0;
-            setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-        }
-
-        if (!isDragging) return;
-
-        const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        selectionRect.x = Math.min(startCoords.x, currentX);
-        selectionRect.y = Math.min(startCoords.y, currentY);
-        selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
-        selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
-        selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-        selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-        selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-        selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
-        selectionCtx.lineWidth = 2;
-        selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-    }
-
-    function handleDragEnd() {
-        if (!isDragging) return;
-        isDragging = false;
-        
-        if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
-            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            return;
-        }
-
-        for (const soldPixel of soldPixels) {
-            const rectA = selectionRect;
-            const rectB = soldPixel;
-            if (rectA.x < rectB.x + rectB.w && rectA.x + rectA.w > rectB.x &&
-                rectA.y < rectB.y + rectB.h && rectA.y + rectA.h > rectB.y) {
-                showMessage('Selection overlaps with an owned area.', 'error');
-                selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
-                selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-                setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
+                updateStats();
                 return;
             }
+
+            snapshot.docs.forEach(doc => {
+                const pixel = doc.data();
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.src = pixel.img;
+                img.onload = () => {
+                    gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
+                    for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
+                        for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
+                            pixelDataCache.set(`${i},${j}`, pixel);
+                        }
+                    }
+                    
+                    imagesToLoad--;
+                    if (imagesToLoad === 0 && !isDataLoaded) {
+                        isDataLoaded = true;
+                        loadingOverlay.style.display = 'none';
+                        selectionCanvas.classList.remove('pointer-events-none');
+                    }
+                };
+            });
+            updateStats();
+        });
+
+        function getEventPos(canvas, evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
         }
 
-        const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-        const totalPrice = numBlocks * PRICE_PER_BLOCK;
-        document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
-        document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        
-        const modal = document.getElementById('purchase-modal');
-        modal.classList.remove('hidden');
-        setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
-    }
+        function handleDragStart(e) {
+            isDragging = true;
+            const pos = getEventPos(selectionCanvas, e);
+            startCoords.x = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            startCoords.y = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            selectionRect = { x: startCoords.x, y: startCoords.y, w: 0, h: 0 };
+        }
 
-    function handleClick(e) {
-        if (isDragging) return;
-        const pos = getEventPos(selectionCanvas, e);
-        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const data = pixelDataCache.get(`${blockX},${blockY}`);
+        function handleDragMove(e) {
+            if (isDragging && e.type.startsWith('touch')) e.preventDefault();
+            
+            const pos = getEventPos(selectionCanvas, e);
+            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const data = pixelDataCache.get(`${blockX},${blockY}`);
 
-        if (data) {
-            handleDragMove(e);
-        } else {
+            if (data && !isDragging) {
+                document.getElementById('tooltip-img').src = data.img;
+                document.getElementById('tooltip-title').textContent = data.title;
+                document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
+                const linkEl = document.getElementById('tooltip-link');
+                linkEl.href = data.link;
+                linkEl.textContent = data.link;
+                
+                const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : evt.clientY;
+                tooltip.style.display = 'block';
+                const tooltipRect = tooltip.getBoundingClientRect();
+                let left = clientX + 15;
+                let top = clientY + 15;
+
+                if (left + tooltipRect.width > window.innerWidth) {
+                    left = clientX - tooltipRect.width - 15;
+                }
+                if (top + tooltipRect.height > window.innerHeight) {
+                    top = clientY - tooltipRect.height - 15;
+                }
+                
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.style.opacity = 1;
+            } else {
+                tooltip.style.opacity = 0;
+                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+            }
+
+            if (!isDragging) return;
+
+            const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            selectionRect.x = Math.min(startCoords.x, currentX);
+            selectionRect.y = Math.min(startCoords.y, currentY);
+            selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
+            selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
+            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+            selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+            selectionCtx.lineWidth = 2;
+            selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+        }
+
+        function handleDragEnd() {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
+                selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+                return;
+            }
+
+            for (const soldPixel of soldPixels) {
+                const rectA = selectionRect;
+                const rectB = soldPixel;
+                if (rectA.x < rectB.x + rectB.w && rectA.x + rectA.w > rectB.x &&
+                    rectA.y < rectB.y + rectB.h && rectA.y + rectA.h > rectB.y) {
+                    showMessage('Selection overlaps with an owned area.', 'error');
+                    selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                    selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+                    setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
+                    return;
+                }
+            }
+
+            const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+            const totalPrice = numBlocks * PRICE_PER_BLOCK;
+            document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
+            document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            
+            const modal = document.getElementById('purchase-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
+        }
+
+        function handleClick(e) {
+            if (isDragging) return;
+            const pos = getEventPos(selectionCanvas, e);
+            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+            const data = pixelDataCache.get(`${blockX},${blockY}`);
+
+            if (data) {
+                handleDragMove(e);
+            } else {
+                tooltip.style.opacity = 0;
+                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+            }
+        }
+
+        document.getElementById('image-upload').addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                selectedFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('image-preview').src = event.target.result;
+                }
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+
+        selectionCanvas.addEventListener('mousedown', handleDragStart);
+        selectionCanvas.addEventListener('mousemove', handleDragMove);
+        selectionCanvas.addEventListener('mouseup', handleDragEnd);
+        selectionCanvas.addEventListener('mouseleave', () => { 
+            if (isDragging) handleDragEnd();
             tooltip.style.opacity = 0;
             setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-        }
-    }
-
-    document.getElementById('image-upload').addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-            selectedFile = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                document.getElementById('image-preview').src = event.target.result;
-            }
-            reader.readAsDataURL(selectedFile);
-        }
-    });
-
-    selectionCanvas.addEventListener('mousedown', handleDragStart);
-    selectionCanvas.addEventListener('mousemove', handleDragMove);
-    selectionCanvas.addEventListener('mouseup', handleDragEnd);
-    selectionCanvas.addEventListener('mouseleave', () => { 
-        if (isDragging) handleDragEnd();
-        tooltip.style.opacity = 0;
-        setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-    });
-    selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
-    selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
-    selectionCanvas.addEventListener('touchend', handleDragEnd);
-    selectionCanvas.addEventListener('click', handleClick);
-    
-    document.getElementById('close-modal').addEventListener('click', () => {
-        const modal = document.getElementById('purchase-modal');
-        modal.querySelector('div').classList.add('scale-95');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-        }, 300);
-    });
-
-    function processImageForUpload(file, targetWidth, targetHeight) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = targetWidth;
-                    tempCanvas.height = targetHeight;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                    tempCanvas.toBlob((blob) => {
-                        if (blob) resolve(blob);
-                        else reject(new Error('Canvas to Blob conversion failed'));
-                    }, 'image/png');
-                };
-                img.onerror = reject;
-            };
-            reader.onerror = reject;
         });
-    }
+        selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
+        selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
+        selectionCanvas.addEventListener('touchend', handleDragEnd);
+        selectionCanvas.addEventListener('click', handleClick);
+        
+        document.getElementById('close-modal').addEventListener('click', () => {
+            const modal = document.getElementById('purchase-modal');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            }, 300);
+        });
 
-    async function handlePurchase(ownerName) {
-        showMessage('Processing image...', 'info');
-        try {
-            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-            const storageRef = ref(storage, fileName);
-            const snapshot = await uploadBytes(storageRef, processedImageBlob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            const newPixelData = {
-                ...selectionRect,
-                title: document.getElementById('title').value,
-                owner: ownerName,
-                link: document.getElementById('link-url').value,
-                img: downloadURL,
-                purchaseDate: new Date().toISOString()
-            };
-            const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
-            await setDoc(doc(db, "pixels", docId), newPixelData);
-            showMessage('Upload complete! Your pixels are live.', 'success');
-            document.getElementById('close-modal').click();
-            document.getElementById('image-upload').value = '';
-            document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
-            ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-            selectedFile = null;
-        } catch (error) {
-            console.error("Error during upload or save: ", error);
-            showMessage('Image processing failed.', 'error');
-        }
-    }
-
-    const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
-    document.getElementById('checkout-button').addEventListener('click', async () => {
-        if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-            showMessage('Please fill out all fields and upload an image.', 'error');
-            return;
-        }
-
-        const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-        const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
-        const cancelUrl = window.location.href.split('?')[0];
-
-        showMessage('Preparing your pixels...', 'info');
-
-        try {
-            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-            if (!processedImageBlob) {
-                throw new Error('Image processing failed to produce a valid blob');
-            }
-            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-            const storageRef = ref(storage, fileName);
-            const snapshot = await uploadBytes(storageRef, processedImageBlob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-
-            const tempId = `temp_${Date.now()}`;
-            const tempDocRef = doc(db, "pending_pixels", tempId);
-            await setDoc(tempDocRef, {
-                ...selectionRect,
-                title: document.getElementById('title').value,
-                link: document.getElementById('link-url').value,
-                img: downloadURL,
-                purchaseDate: new Date().toISOString()
+        function processImageForUpload(file, targetWidth, targetHeight) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = targetWidth;
+                        tempCanvas.height = targetHeight;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        tempCanvas.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('Canvas to Blob conversion failed'));
+                        }, 'image/png');
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
             });
-
-            stripe.redirectToCheckout({
-                lineItems: [{ price: 'price_1RxlK9IpvwwhCV4xAyaFyM8o', quantity: numBlocks }],
-                mode: 'payment',
-                successUrl: `${successUrl}&pending_id=${tempId}`,
-                cancelUrl: cancelUrl,
-            });
-
-        } catch(error) {
-            console.error("Error preparing for checkout: ", error);
-            showMessage('Could not prepare your image for purchase.', 'error');
         }
-    });
 
-    async function finalizePurchase() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const pendingId = urlParams.get('pending_id');
-        if (pendingId) {
-            const tempDocRef = doc(db, "pending_pixels", pendingId);
-            const tempDocSnap = await getDoc(tempDocRef);
-
-            if (tempDocSnap.exists()) {
-                const pixelData = tempDocSnap.data();
-                const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
-                await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' });
-                await deleteDoc(tempDocRef);
-                showMessage('Purchase successful! Your pixels are live.', 'success');
+        async function handlePurchase(ownerName) {
+            showMessage('Processing image...', 'info');
+            try {
+                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                const storageRef = ref(storage, fileName);
+                const snapshot = await uploadBytes(storageRef, processedImageBlob);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                const newPixelData = {
+                    ...selectionRect,
+                    title: document.getElementById('title').value,
+                    owner: ownerName,
+                    link: document.getElementById('link-url').value,
+                    img: downloadURL,
+                    purchaseDate: new Date().toISOString()
+                };
+                const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
+                await setDoc(doc(db, "pixels", docId), newPixelData);
+                showMessage('Upload complete! Your pixels are live.', 'success');
+                document.getElementById('close-modal').click();
+                document.getElementById('image-upload').value = '';
+                document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
+                ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+                selectedFile = null;
+            } catch (error) {
+                console.error("Error during upload or save: ", error);
+                showMessage('Image processing failed.', 'error');
             }
-            window.history.replaceState({}, document.title, window.location.pathname);
         }
-    }
 
-    drawGridLines();
-    finalizePurchase();
-</script>
-</body>
+        const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
+        document.getElementById('checkout-button').addEventListener('click', async () => {
+            if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+                showMessage('Please fill out all fields and upload an image.', 'error');
+                return;
+            }
+
+            const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+            const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
+            const cancelUrl = window.location.href.split('?')[0];
+
+            showMessage('Preparing your pixels...', 'info');
+
+            try {
+                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+                if (!processedImageBlob) {
+                    throw new Error('Image processing failed to produce a valid blob');
+                }
+                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+                const storageRef = ref(storage, fileName);
+                const snapshot = await uploadBytes(storageRef, processedImageBlob);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                const tempId = `temp_${Date.now()}`;
+                const tempDocRef = doc(db, "pending_pixels", tempId);
+                await setDoc(tempDocRef, {
+                    ...selectionRect,
+                    title: document.getElementById('title').value,
+                    link: document.getElementById('link-url').value,
+                    img: downloadURL,
+                    purchaseDate: new Date().toISOString()
+                });
+
+                stripe.redirectToCheckout({
+                    lineItems: [{ price: 'price_1RxlK9IpvwwhCV4xAyaFyM8o', quantity: numBlocks }],
+                    mode: 'payment',
+                    successUrl: `${successUrl}&pending_id=${tempId}`,
+                    cancelUrl: cancelUrl,
+                });
+
+            } catch(error) {
+                console.error("Error preparing for checkout: ", error);
+                showMessage('Could not prepare your image for purchase.', 'error');
+            }
+        });
+
+        async function finalizePurchase() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pendingId = urlParams.get('pending_id');
+            if (pendingId) {
+                const tempDocRef = doc(db, "pending_pixels", pendingId);
+                const tempDocSnap = await getDoc(tempDocRef);
+
+                if (tempDocSnap.exists()) {
+                    const pixelData = tempDocSnap.data();
+                    const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
+                    await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' });
+                    await deleteDoc(tempDocRef);
+                    showMessage('Purchase successful! Your pixels are live.', 'success');
+                }
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        drawGridLines();
+        finalizePurchase();
+    </script>
 </html>
