@@ -148,6 +148,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
@@ -163,6 +164,14 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const storage = getStorage(app);
+        const auth = getAuth(app);
+        signInAnonymously(auth)
+          .then(() => {
+            console.log('Signed in anonymously');
+          })
+          .catch((error) => {
+            console.error('Anonymous auth error:', error);
+          });
 
         const pixelGridCanvas = document.getElementById('pixel-grid');
         const gridCtx = pixelGridCanvas.getContext('2d');
