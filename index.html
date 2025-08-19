@@ -151,11 +151,13 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
+        const TEST_MODE = true;
+
         const firebaseConfig = {
             apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
             authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
             projectId: "themilliondollarbillboar-d003e",
-            storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
+            storageBucket: "themilliondollarbillboar-d003e.appspot.com", // CORRECTED
             messagingSenderId: "980560213272",
             appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
         };
