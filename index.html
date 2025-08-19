@@ -147,400 +147,403 @@
     </footer>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
-            authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
-            projectId: "themilliondollarbillboar-d003e",
-            storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
-            messagingSenderId: "980560213272",
-            appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
+        authDomain: "themilliondollarbillboar-d003e.firebaseapp.com",
+        projectId: "themilliondollarbillboar-d003e",
+        storageBucket: "themilliondollarbillboar-d003e.firebasestorage.app",
+        messagingSenderId: "980560213272",
+        appId: "1:980560213272:web:016fab11a5a467af9d5a6d"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
-        const auth = getAuth(app);
-        signInAnonymously(auth)
-          .then(() => {
-            console.log('Signed in anonymously');
-          })
-          .catch((error) => {
-            console.error('Anonymous auth error:', error);
-          });
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const auth = getAuth(app);
+    signInAnonymously(auth)
+      .then(() => {
+        console.log('Signed in anonymously');
+      })
+      .catch((error) => {
+        console.error('Anonymous auth error:', error);
+      });
 
-        const pixelGridCanvas = document.getElementById('pixel-grid');
-        const gridCtx = pixelGridCanvas.getContext('2d');
-        const selectionCanvas = document.getElementById('selection-canvas');
-        const selectionCtx = selectionCanvas.getContext('2d');
-        const loadingOverlay = document.getElementById('loading-overlay');
-        const tooltip = document.getElementById('tooltip');
+    const pixelGridCanvas = document.getElementById('pixel-grid');
+    const gridCtx = pixelGridCanvas.getContext('2d');
+    const selectionCanvas = document.getElementById('selection-canvas');
+    const selectionCtx = selectionCanvas.getContext('2d');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const tooltip = document.getElementById('tooltip');
+    
+    const GRID_SIZE = 1000;
+    const PIXEL_BLOCK_SIZE = 10;
+    const PRICE_PER_BLOCK = 100.00; 
+    
+    let isDataLoaded = false;
+
+    const soldPixels = [];
+    const pixelDataCache = new Map();
+    let isDragging = false;
+    let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
+    let startCoords = { x: 0, y: 0 };
+    let selectedFile = null;
+
+    function drawGridLines() {
+        gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+        gridCtx.lineWidth = 1;
+        for (let i = 0; i <= GRID_SIZE; i += PIXEL_BLOCK_SIZE) {
+            gridCtx.beginPath(); gridCtx.moveTo(i, 0); gridCtx.lineTo(i, GRID_SIZE); gridCtx.stroke();
+            gridCtx.beginPath(); gridCtx.moveTo(0, i); gridCtx.lineTo(GRID_SIZE, i); gridCtx.stroke();
+        }
+    }
+    
+    function updateStats() {
+        const totalSoldPixels = soldPixels.reduce((acc, p) => {
+            const width = p.w || 0;
+            const height = p.h || 0;
+            return acc + (width * height);
+        }, 0);
+        const totalPixels = GRID_SIZE * GRID_SIZE;
+        document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
+        document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
+    }
+
+    function showMessage(text, type = 'info') {
+        const container = document.getElementById('message-container');
+        const messageDiv = document.createElement('div');
+        const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
+        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+        messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
+        messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
+        container.appendChild(messageDiv);
+        setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
+        setTimeout(() => {
+            messageDiv.classList.add('translate-x-full', 'opacity-0');
+            setTimeout(() => messageDiv.remove(), 300);
+        }, 4000);
+    }
+
+    const pixelsCollection = collection(db, "pixels");
+    const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
+        soldPixels.length = 0;
+        pixelDataCache.clear();
+        snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
+
+        gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+        drawGridLines();
         
-        const GRID_SIZE = 1000;
-        const PIXEL_BLOCK_SIZE = 10;
-        const PRICE_PER_BLOCK = 100.00; 
-        
-        let isDataLoaded = false;
+        let imagesToLoad = snapshot.docs.length;
 
-        const soldPixels = [];
-        const pixelDataCache = new Map();
-        let isDragging = false;
-        let selectionRect = { x: 0, y: 0, w: 0, h: 0 };
-        let startCoords = { x: 0, y: 0 };
-        let selectedFile = null;
-
-        function drawGridLines() {
-            gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            gridCtx.lineWidth = 1;
-            for (let i = 0; i <= GRID_SIZE; i += PIXEL_BLOCK_SIZE) {
-                gridCtx.beginPath(); gridCtx.moveTo(i, 0); gridCtx.lineTo(i, GRID_SIZE); gridCtx.stroke();
-                gridCtx.beginPath(); gridCtx.moveTo(0, i); gridCtx.lineTo(GRID_SIZE, i); gridCtx.stroke();
+        if (imagesToLoad === 0) {
+            if (!isDataLoaded) {
+                isDataLoaded = true;
+                loadingOverlay.style.display = 'none';
+                selectionCanvas.classList.remove('pointer-events-none');
             }
-        }
-        
-        function updateStats() {
-            const totalSoldPixels = soldPixels.reduce((acc, p) => {
-                const width = p.w || 0;
-                const height = p.h || 0;
-                return acc + (width * height);
-            }, 0);
-            const totalPixels = GRID_SIZE * GRID_SIZE;
-            document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
-            document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
+            updateStats();
+            return;
         }
 
-        function showMessage(text, type = 'info') {
-            const container = document.getElementById('message-container');
-            const messageDiv = document.createElement('div');
-            const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
-            const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
-            messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
-            messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
-            container.appendChild(messageDiv);
-            setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
-            setTimeout(() => {
-                messageDiv.classList.add('translate-x-full', 'opacity-0');
-                setTimeout(() => messageDiv.remove(), 300);
-            }, 4000);
-        }
-
-        const pixelsCollection = collection(db, "pixels");
-        const unsubscribe = onSnapshot(pixelsCollection, (snapshot) => {
-            soldPixels.length = 0;
-            pixelDataCache.clear();
-            snapshot.docs.forEach(doc => soldPixels.push(doc.data()));
-
-            gridCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            drawGridLines();
-            
-            let imagesToLoad = snapshot.docs.length;
-
-            if (imagesToLoad === 0) {
-                if (!isDataLoaded) {
+        snapshot.docs.forEach(doc => {
+            const pixel = doc.data();
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.src = pixel.img;
+            img.onload = () => {
+                gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
+                for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
+                    for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
+                        pixelDataCache.set(`${i},${j}`, pixel);
+                    }
+                }
+                
+                imagesToLoad--;
+                if (imagesToLoad === 0 && !isDataLoaded) {
                     isDataLoaded = true;
                     loadingOverlay.style.display = 'none';
                     selectionCanvas.classList.remove('pointer-events-none');
                 }
-                updateStats();
-                return;
-            }
-
-            snapshot.docs.forEach(doc => {
-                const pixel = doc.data();
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = pixel.img;
-                img.onload = () => {
-                    gridCtx.drawImage(img, pixel.x, pixel.y, pixel.w, pixel.h);
-                    for (let i = pixel.x; i < pixel.x + pixel.w; i += PIXEL_BLOCK_SIZE) {
-                        for (let j = pixel.y; j < pixel.y + pixel.h; j += PIXEL_BLOCK_SIZE) {
-                            pixelDataCache.set(`${i},${j}`, pixel);
-                        }
-                    }
-                    
-                    imagesToLoad--;
-                    if (imagesToLoad === 0 && !isDataLoaded) {
-                        isDataLoaded = true;
-                        loadingOverlay.style.display = 'none';
-                        selectionCanvas.classList.remove('pointer-events-none');
-                    }
-                };
-            });
-            updateStats();
+            };
         });
+        updateStats();
+    });
 
-        function getEventPos(canvas, evt) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
-            const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
-            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
-        }
+    function getEventPos(canvas, evt) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    }
 
-        function handleDragStart(e) {
-            isDragging = true;
-            const pos = getEventPos(selectionCanvas, e);
-            startCoords.x = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            startCoords.y = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            selectionRect = { x: startCoords.x, y: startCoords.y, w: 0, h: 0 };
-        }
+    function handleDragStart(e) {
+        isDragging = true;
+        const pos = getEventPos(selectionCanvas, e);
+        startCoords.x = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        startCoords.y = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        selectionRect = { x: startCoords.x, y: startCoords.y, w: 0, h: 0 };
+    }
 
-        function handleDragMove(e) {
-            if (isDragging && e.type.startsWith('touch')) e.preventDefault();
+    function handleDragMove(e) {
+        if (isDragging && e.type.startsWith('touch')) e.preventDefault();
+        
+        const pos = getEventPos(selectionCanvas, e);
+        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const data = pixelDataCache.get(`${blockX},${blockY}`);
+
+        if (data && !isDragging) {
+            document.getElementById('tooltip-img').src = data.img;
+            document.getElementById('tooltip-title').textContent = data.title;
+            document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
+            const linkEl = document.getElementById('tooltip-link');
+            linkEl.href = data.link;
+            linkEl.textContent = data.link;
             
-            const pos = getEventPos(selectionCanvas, e);
-            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const data = pixelDataCache.get(`${blockX},${blockY}`);
+            const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+            tooltip.style.display = 'block';
+            const tooltipRect = tooltip.getBoundingClientRect();
+            let left = clientX + 15;
+            let top = clientY + 15;
 
-            if (data && !isDragging) {
-                document.getElementById('tooltip-img').src = data.img;
-                document.getElementById('tooltip-title').textContent = data.title;
-                document.getElementById('tooltip-owner').textContent = `Owner: ${data.owner}`;
-                const linkEl = document.getElementById('tooltip-link');
-                linkEl.href = data.link;
-                linkEl.textContent = data.link;
-                
-                const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
-                const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-                tooltip.style.display = 'block';
-                const tooltipRect = tooltip.getBoundingClientRect();
-                let left = clientX + 15;
-                let top = clientY + 15;
-
-                if (left + tooltipRect.width > window.innerWidth) {
-                    left = clientX - tooltipRect.width - 15;
-                }
-                if (top + tooltipRect.height > window.innerHeight) {
-                    top = clientY - tooltipRect.height - 15;
-                }
-                
-                tooltip.style.left = `${left}px`;
-                tooltip.style.top = `${top}px`;
-                tooltip.style.opacity = 1;
-            } else {
-                tooltip.style.opacity = 0;
-                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+            if (left + tooltipRect.width > window.innerWidth) {
+                left = clientX - tooltipRect.width - 15;
             }
-
-            if (!isDragging) return;
-
-            const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            selectionRect.x = Math.min(startCoords.x, currentX);
-            selectionRect.y = Math.min(startCoords.y, currentY);
-            selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
-            selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
-            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-            selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-            selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
-            selectionCtx.lineWidth = 2;
-            selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-        }
-
-        function handleDragEnd() {
-            if (!isDragging) return;
-            isDragging = false;
+            if (top + tooltipRect.height > window.innerHeight) {
+                top = clientY - tooltipRect.height - 15;
+            }
             
-            if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
-                selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-                return;
-            }
-
-            for (const soldPixel of soldPixels) {
-                const rectA = selectionRect;
-                const rectB = soldPixel;
-                if (rectA.x < rectB.x + rectB.w && rectA.x + rectA.w > rectB.x &&
-                    rectA.y < rectB.y + rectB.h && rectA.y + rectA.h > rectB.y) {
-                    showMessage('Selection overlaps with an owned area.', 'error');
-                    selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
-                    selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
-                    setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
-                    return;
-                }
-            }
-
-            const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-            const totalPrice = numBlocks * PRICE_PER_BLOCK;
-            document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
-            document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            
-            const modal = document.getElementById('purchase-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
-        }
-
-        function handleClick(e) {
-            if (isDragging) return;
-            const pos = getEventPos(selectionCanvas, e);
-            const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-            const data = pixelDataCache.get(`${blockX},${blockY}`);
-
-            if (data) {
-                handleDragMove(e);
-            } else {
-                tooltip.style.opacity = 0;
-                setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-            }
-        }
-
-        document.getElementById('image-upload').addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                selectedFile = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    document.getElementById('image-preview').src = event.target.result;
-                }
-                reader.readAsDataURL(selectedFile);
-            }
-        });
-
-        selectionCanvas.addEventListener('mousedown', handleDragStart);
-        selectionCanvas.addEventListener('mousemove', handleDragMove);
-        selectionCanvas.addEventListener('mouseup', handleDragEnd);
-        selectionCanvas.addEventListener('mouseleave', () => { 
-            if (isDragging) handleDragEnd();
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+            tooltip.style.opacity = 1;
+        } else {
             tooltip.style.opacity = 0;
             setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-        });
-        selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
-        selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
-        selectionCanvas.addEventListener('touchend', handleDragEnd);
-        selectionCanvas.addEventListener('click', handleClick);
+        }
+
+        if (!isDragging) return;
+
+        const currentX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        selectionRect.x = Math.min(startCoords.x, currentX);
+        selectionRect.y = Math.min(startCoords.y, currentY);
+        selectionRect.w = Math.abs(startCoords.x - currentX) + PIXEL_BLOCK_SIZE;
+        selectionRect.h = Math.abs(startCoords.y - currentY) + PIXEL_BLOCK_SIZE;
+        selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+        selectionCtx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+        selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+        selectionCtx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+        selectionCtx.lineWidth = 2;
+        selectionCtx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+    }
+
+    function handleDragEnd() {
+        if (!isDragging) return;
+        isDragging = false;
         
-        document.getElementById('close-modal').addEventListener('click', () => {
-            const modal = document.getElementById('purchase-modal');
-            modal.querySelector('div').classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
-            }, 300);
-        });
-
-        function processImageForUpload(file, targetWidth, targetHeight) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = targetWidth;
-                        tempCanvas.height = targetHeight;
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                        tempCanvas.toBlob((blob) => {
-                            if (blob) resolve(blob);
-                            else reject(new Error('Canvas to Blob conversion failed'));
-                        }, 'image/png');
-                    };
-                    img.onerror = reject;
-                };
-                reader.onerror = reject;
-            });
+        if (selectionRect.w < PIXEL_BLOCK_SIZE || selectionRect.h < PIXEL_BLOCK_SIZE) {
+            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+            return;
         }
 
-        async function handlePurchase(ownerName) {
-            showMessage('Processing image...', 'info');
-            try {
-                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-                const storageRef = ref(storage, fileName);
-                const snapshot = await uploadBytes(storageRef, processedImageBlob);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                const newPixelData = {
-                    ...selectionRect,
-                    title: document.getElementById('title').value,
-                    owner: ownerName,
-                    link: document.getElementById('link-url').value,
-                    img: downloadURL,
-                    purchaseDate: new Date().toISOString()
-                };
-                const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
-                await setDoc(doc(db, "pixels", docId), newPixelData);
-                showMessage('Upload complete! Your pixels are live.', 'success');
-                document.getElementById('close-modal').click();
-                document.getElementById('image-upload').value = '';
-                document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
-                ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-                selectedFile = null;
-            } catch (error) {
-                console.error("Error during upload or save: ", error);
-                showMessage('Image processing failed.', 'error');
-            }
-        }
-
-        const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
-        document.getElementById('checkout-button').addEventListener('click', async () => {
-            if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
-                showMessage('Please fill out all fields and upload an image.', 'error');
+        for (const soldPixel of soldPixels) {
+            const rectA = selectionRect;
+            const rectB = soldPixel;
+            if (rectA.x < rectB.x + rectB.w && rectA.x + rectA.w > rectB.x &&
+                rectA.y < rectB.y + rectB.h && rectA.y + rectA.h > rectB.y) {
+                showMessage('Selection overlaps with an owned area.', 'error');
+                selectionCtx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                selectionCtx.fillRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+                setTimeout(() => selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE), 1000);
                 return;
             }
-
-            const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-            const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
-            const cancelUrl = window.location.href.split('?')[0];
-
-            showMessage('Preparing your pixels...', 'info');
-
-            try {
-                const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-                const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-                const storageRef = ref(storage, fileName);
-                const snapshot = await uploadBytes(storageRef, processedImageBlob);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-
-                const tempId = `temp_${Date.now()}`;
-                const tempDocRef = doc(db, "pending_pixels", tempId);
-                await setDoc(tempDocRef, {
-                    ...selectionRect,
-                    title: document.getElementById('title').value,
-                    link: document.getElementById('link-url').value,
-                    img: downloadURL,
-                    purchaseDate: new Date().toISOString()
-                });
-
-                stripe.redirectToCheckout({
-                    lineItems: [{ price: 'price_1RxlK9IpvwwhCV4xAyaFyM8o', quantity: numBlocks }],
-                    mode: 'payment',
-                    successUrl: `${successUrl}&pending_id=${tempId}`,
-                    cancelUrl: cancelUrl,
-                });
-
-            } catch(error) {
-                console.error("Error preparing for checkout: ", error);
-                showMessage('Could not prepare your image for purchase.', 'error');
-            }
-        });
-
-        async function finalizePurchase() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const pendingId = urlParams.get('pending_id');
-            if (pendingId) {
-                const tempDocRef = doc(db, "pending_pixels", pendingId);
-                const tempDocSnap = await getDoc(tempDocRef);
-
-                if (tempDocSnap.exists()) {
-                    const pixelData = tempDocSnap.data();
-                    const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
-                    await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' });
-                    await deleteDoc(tempDocRef);
-                    showMessage('Purchase successful! Your pixels are live.', 'success');
-                }
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
         }
 
-        drawGridLines();
-        finalizePurchase();
-    </script>
+        const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+        const totalPrice = numBlocks * PRICE_PER_BLOCK;
+        document.getElementById('selection-size').textContent = `${selectionRect.w}x${selectionRect.h}`;
+        document.getElementById('total-price').textContent = totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        const modal = document.getElementById('purchase-modal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.querySelector('div').classList.remove('scale-95'), 10);
+    }
+
+    function handleClick(e) {
+        if (isDragging) return;
+        const pos = getEventPos(selectionCanvas, e);
+        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const data = pixelDataCache.get(`${blockX},${blockY}`);
+
+        if (data) {
+            handleDragMove(e);
+        } else {
+            tooltip.style.opacity = 0;
+            setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+        }
+    }
+
+    document.getElementById('image-upload').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            selectedFile = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                document.getElementById('image-preview').src = event.target.result;
+            }
+            reader.readAsDataURL(selectedFile);
+        }
+    });
+
+    selectionCanvas.addEventListener('mousedown', handleDragStart);
+    selectionCanvas.addEventListener('mousemove', handleDragMove);
+    selectionCanvas.addEventListener('mouseup', handleDragEnd);
+    selectionCanvas.addEventListener('mouseleave', () => { 
+        if (isDragging) handleDragEnd();
+        tooltip.style.opacity = 0;
+        setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
+    });
+    selectionCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
+    selectionCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
+    selectionCanvas.addEventListener('touchend', handleDragEnd);
+    selectionCanvas.addEventListener('click', handleClick);
+    
+    document.getElementById('close-modal').addEventListener('click', () => {
+        const modal = document.getElementById('purchase-modal');
+        modal.querySelector('div').classList.add('scale-95');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
+        }, 300);
+    });
+
+    function processImageForUpload(file, targetWidth, targetHeight) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = targetWidth;
+                    tempCanvas.height = targetHeight;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                    tempCanvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Canvas to Blob conversion failed'));
+                    }, 'image/png');
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    }
+
+    async function handlePurchase(ownerName) {
+        showMessage('Processing image...', 'info');
+        try {
+            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+            const storageRef = ref(storage, fileName);
+            const snapshot = await uploadBytes(storageRef, processedImageBlob);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            const newPixelData = {
+                ...selectionRect,
+                title: document.getElementById('title').value,
+                owner: ownerName,
+                link: document.getElementById('link-url').value,
+                img: downloadURL,
+                purchaseDate: new Date().toISOString()
+            };
+            const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
+            await setDoc(doc(db, "pixels", docId), newPixelData);
+            showMessage('Upload complete! Your pixels are live.', 'success');
+            document.getElementById('close-modal').click();
+            document.getElementById('image-upload').value = '';
+            document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
+            ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
+            selectedFile = null;
+        } catch (error) {
+            console.error("Error during upload or save: ", error);
+            showMessage('Image processing failed.', 'error');
+        }
+    }
+
+    const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
+    document.getElementById('checkout-button').addEventListener('click', async () => {
+        if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
+            showMessage('Please fill out all fields and upload an image.', 'error');
+            return;
+        }
+
+        const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+        const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = window.location.href.split('?')[0];
+
+        showMessage('Preparing your pixels...', 'info');
+
+        try {
+            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
+            if (!processedImageBlob) {
+                throw new Error('Image processing failed to produce a valid blob');
+            }
+            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
+            const storageRef = ref(storage, fileName);
+            const snapshot = await uploadBytes(storageRef, processedImageBlob);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+
+            const tempId = `temp_${Date.now()}`;
+            const tempDocRef = doc(db, "pending_pixels", tempId);
+            await setDoc(tempDocRef, {
+                ...selectionRect,
+                title: document.getElementById('title').value,
+                link: document.getElementById('link-url').value,
+                img: downloadURL,
+                purchaseDate: new Date().toISOString()
+            });
+
+            stripe.redirectToCheckout({
+                lineItems: [{ price: 'price_1RxlK9IpvwwhCV4xAyaFyM8o', quantity: numBlocks }],
+                mode: 'payment',
+                successUrl: `${successUrl}&pending_id=${tempId}`,
+                cancelUrl: cancelUrl,
+            });
+
+        } catch(error) {
+            console.error("Error preparing for checkout: ", error);
+            showMessage('Could not prepare your image for purchase.', 'error');
+        }
+    });
+
+    async function finalizePurchase() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const pendingId = urlParams.get('pending_id');
+        if (pendingId) {
+            const tempDocRef = doc(db, "pending_pixels", pendingId);
+            const tempDocSnap = await getDoc(tempDocRef);
+
+            if (tempDocSnap.exists()) {
+                const pixelData = tempDocSnap.data();
+                const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
+                await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' });
+                await deleteDoc(tempDocRef);
+                showMessage('Purchase successful! Your pixels are live.', 'success');
+            }
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+
+    drawGridLines();
+    finalizePurchase();
+</script>
 </body>
 </html>
