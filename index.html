@@ -381,19 +381,16 @@
     }
 
     function handleClick(e) {
-        if (isDragging) return;
-        const pos = getEventPos(selectionCanvas, e);
-        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-        const data = pixelDataCache.get(`${blockX},${blockY}`);
+    if (isDragging) return;
+    const pos = getEventPos(selectionCanvas, e);
+    const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+    const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+    const data = pixelDataCache.get(`${blockX},${blockY}`);
 
-        if (data) {
-            handleDragMove(e);
-        } else {
-            tooltip.style.opacity = 0;
-            setTimeout(() => { if (tooltip.style.opacity === '0') tooltip.style.display = 'none'; }, 200);
-        }
+    if (data && data.link) { // Check if data and a link exist
+        window.open(data.link, '_blank'); // Open the link in a new tab
     }
+}
 
     document.getElementById('image-upload').addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
