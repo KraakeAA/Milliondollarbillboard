@@ -479,7 +479,7 @@
         }
     }
 
-    const stripe = Stripe('pk_live_51P2I59RpJd97rS6lI0f5F9F6G0B4C8y4c2j7a7h3G3v3e3f1C6u7G7V7F7W7V7X7Y7Z7C7D7E7F7G7H');
+    const stripe = Stripe('pk_test_51Rxl1vRLgtQ8ebqObjsgYdBwbC5NImjmN4RWYNSBvm1MKNCNKLcthyQVjXKLpUvJHmgks2J8Et6xqmhKX6OIW7jE00duPsSyyk');
     document.getElementById('checkout-button').addEventListener('click', async () => {
         if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
             showMessage('Please fill out all fields and upload an image.', 'error');
