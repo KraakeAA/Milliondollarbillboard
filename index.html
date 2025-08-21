@@ -148,6 +148,7 @@
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, onSnapshot, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+    import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDWvf2nGpOPTLGQJ_q7qY4lCmYxw9n3JWg",
@@ -162,6 +163,8 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
     const auth = getAuth(app);
+    const functions = getFunctions(app);
+
     signInAnonymously(auth)
       .then(() => {
         console.log('Signed in anonymously');
@@ -270,7 +273,6 @@
         updateStats();
     });
 
-    // --- FIX #1: THIS ENTIRE FUNCTION IS REPLACED ---
     function getEventPos(canvas, evt) {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -278,7 +280,6 @@
         const clientX = evt.type.startsWith('touch') ? evt.touches[0].clientX : evt.clientX;
         const clientY = evt.type.startsWith('touch') ? evt.touches[0].clientY : evt.clientY;
         
-        // The fix is here: we clamp the coordinates to stay inside the grid
         const x = Math.min((clientX - rect.left) * scaleX, GRID_SIZE - 1);
         const y = Math.min((clientY - rect.top) * scaleY, GRID_SIZE - 1);
 
@@ -337,7 +338,6 @@
         const currentY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
         selectionRect.x = Math.min(startCoords.x, currentX);
         selectionRect.y = Math.min(startCoords.y, currentY);
-        // --- FIX #2: THESE TWO LINES ARE REPLACED ---
         selectionRect.w = (Math.abs(startCoords.x - currentX) / PIXEL_BLOCK_SIZE + 1) * PIXEL_BLOCK_SIZE;
         selectionRect.h = (Math.abs(startCoords.y - currentY) / PIXEL_BLOCK_SIZE + 1) * PIXEL_BLOCK_SIZE;
         selectionCtx.clearRect(0, 0, GRID_SIZE, GRID_SIZE);
@@ -381,16 +381,16 @@
     }
 
     function handleClick(e) {
-    if (isDragging) return;
-    const pos = getEventPos(selectionCanvas, e);
-    const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-    const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
-    const data = pixelDataCache.get(`${blockX},${blockY}`);
+        if (isDragging) return;
+        const pos = getEventPos(selectionCanvas, e);
+        const blockX = Math.floor(pos.x / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const blockY = Math.floor(pos.y / PIXEL_BLOCK_SIZE) * PIXEL_BLOCK_SIZE;
+        const data = pixelDataCache.get(`${blockX},${blockY}`);
 
-    if (data && data.link) { // Check if data and a link exist
-        window.open(data.link, '_blank'); // Open the link in a new tab
+        if (data && data.link) {
+            window.open(data.link, '_blank');
+        }
     }
-}
 
     document.getElementById('image-upload').addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -425,104 +425,63 @@
         }, 300);
     });
 
-    function processImageForUpload(file, targetWidth, targetHeight) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = targetWidth;
-                    tempCanvas.height = targetHeight;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
-                    tempCanvas.toBlob((blob) => {
-                        if (blob) resolve(blob);
-                        else reject(new Error('Canvas to Blob conversion failed'));
-                    }, 'image/png');
-                };
-                img.onerror = reject;
-            };
-            reader.onerror = reject;
-        });
-    }
-
-    async function handlePurchase(ownerName) {
-        showMessage('Processing image...', 'info');
-        try {
-            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-            const storageRef = ref(storage, fileName);
-            const snapshot = await uploadBytes(storageRef, processedImageBlob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            const newPixelData = {
-                ...selectionRect,
-                title: document.getElementById('title').value,
-                owner: ownerName,
-                link: document.getElementById('link-url').value,
-                img: downloadURL,
-                purchaseDate: new Date().toISOString()
-            };
-            const docId = `${newPixelData.x}-${newPixelData.y}-${newPixelData.w}-${newPixelData.h}`;
-            await setDoc(doc(db, "pixels", docId), newPixelData);
-            showMessage('Upload complete! Your pixels are live.', 'success');
-            document.getElementById('close-modal').click();
-            document.getElementById('image-upload').value = '';
-            document.getElementById('image-preview').src = 'https://placehold.co/80x80/1F2937/4B5563?text=Preview';
-            ['link-url', 'title'].forEach(id => document.getElementById(id).value = '');
-            selectedFile = null;
-        } catch (error) {
-            console.error("Error during upload or save: ", error);
-            showMessage('Image processing failed.', 'error');
-        }
-    }
-
     const stripe = Stripe('pk_test_51Rxl1vRLgtQ8ebqObjsgYdBwbC5NImjmN4RWYNSBvm1MKNCNKLcthyQVjXKLpUvJHmgks2J8Et6xqmhKX6OIW7jE00duPsSyyk');
+    
     document.getElementById('checkout-button').addEventListener('click', async () => {
         if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
             showMessage('Please fill out all fields and upload an image.', 'error');
             return;
         }
 
-        const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
-        const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
-        const cancelUrl = window.location.href.split('?')[0];
-
         showMessage('Preparing your pixels...', 'info');
 
         try {
-            const processedImageBlob = await processImageForUpload(selectedFile, selectionRect.w, selectionRect.h);
-            if (!processedImageBlob) {
-                throw new Error('Image processing failed to produce a valid blob');
-            }
-            const fileName = `pixels/${Date.now()}-${selectedFile.name.split('.')[0]}.png`;
-            const storageRef = ref(storage, fileName);
-            const snapshot = await uploadBytes(storageRef, processedImageBlob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            const uploadImage = httpsCallable(functions, 'uploadImage');
 
-            const tempId = `temp_${Date.now()}`;
-            const tempDocRef = doc(db, "pending_pixels", tempId);
-            await setDoc(tempDocRef, {
-                ...selectionRect,
-                title: document.getElementById('title').value,
-                link: document.getElementById('link-url').value,
-                img: downloadURL,
-                purchaseDate: new Date().toISOString()
-            });
+            const reader = new FileReader();
+            reader.readAsDataURL(selectedFile);
+            reader.onload = async () => {
+                const imageB64 = reader.result.split(',')[1];
+                
+                try {
+                    const result = await uploadImage({ imageB64: imageB64 });
+                    const downloadURL = result.data.downloadURL;
 
-            stripe.redirectToCheckout({
-                lineItems: [{ price: 'price_1P2IBARpJd97rS6lrGzE2k3u', quantity: numBlocks }],
-                mode: 'payment',
-                successUrl: `${successUrl}&pending_id=${tempId}`,
-                metadata: { pending_id: tempId },
-                cancelUrl: cancelUrl,
-            });
+                    const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
+                    const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
+                    const cancelUrl = window.location.href.split('?')[0];
+                    const tempId = `temp_${Date.now()}`;
+                    const tempDocRef = doc(db, "pending_pixels", tempId);
+
+                    await setDoc(tempDocRef, {
+                        ...selectionRect,
+                        title: document.getElementById('title').value,
+                        link: document.getElementById('link-url').value,
+                        img: downloadURL,
+                        purchaseDate: new Date().toISOString()
+                    });
+
+                    stripe.redirectToCheckout({
+                        lineItems: [{ price: 'price_1P2IBARpJd97rS6lrGzE2k3u', quantity: numBlocks }],
+                        mode: 'payment',
+                        successUrl: `${successUrl}&pending_id=${tempId}`,
+                        metadata: { pending_id: tempId },
+                        cancelUrl: cancelUrl,
+                    });
+
+                } catch (error) {
+                    console.error("Error calling uploadImage function: ", error);
+                    showMessage('Image upload failed. Please try a different image.', 'error');
+                }
+            };
+            reader.onerror = (error) => {
+                console.error("File Reader error: ", error);
+                showMessage('Could not read the selected file.', 'error');
+            };
 
         } catch(error) {
             console.error("Error preparing for checkout: ", error);
-            showMessage('Could not prepare your image for purchase.', 'error');
+            showMessage('Could not prepare your purchase.', 'error');
         }
     });
 
@@ -530,16 +489,9 @@
         const urlParams = new URLSearchParams(window.location.search);
         const pendingId = urlParams.get('pending_id');
         if (pendingId) {
-            const tempDocRef = doc(db, "pending_pixels", pendingId);
-            const tempDocSnap = await getDoc(tempDocRef);
-
-            if (tempDocSnap.exists()) {
-                const pixelData = tempDocSnap.data();
-                const finalDocId = `${pixelData.x}-${pixelData.y}-${pixelData.w}-${pixelData.h}`;
-                await setDoc(doc(db, "pixels", finalDocId), { ...pixelData, owner: 'New Purchaser' });
-                await deleteDoc(tempDocRef);
-                showMessage('Purchase successful! Your pixels are live.', 'success');
-            }
+            // This part is now handled by the webhook, but we'll leave it
+            // here to show a success message if the user is redirected with the ID.
+            showMessage('Payment successful! Your pixels will appear shortly.', 'success');
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
