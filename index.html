@@ -500,7 +500,7 @@
         }, 300);
     });
 
-    const stripe = Stripe('pk_test_51Rxl1vRLgtQ8ebqObjsgYdBwbC5NImjmN4RWYNSBvm1MKNCNKLcthyQVjXKLpUvJHmgks2J8Et6xqmhKX6OIW7jE00duPsSyyk');
+    const stripe = Stripe('pk_live_51Rxl1nIpvwwhCV4xRtu8616TGMJYP2cLkzlmKVb2WAGQFbY1J9HpGGU9tbDFGV0fPoSrTbGPmIgXyNRDcn3b0rqI00gHcN9MOR');
     
     document.getElementById('checkout-button').addEventListener('click', async () => {
         if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
@@ -542,7 +542,7 @@
                     });
 
                     stripe.redirectToCheckout({
-                        lineItems: [{ price: 'price_1RyZNURLgtQ8ebqOMrbWRaLJ', quantity: numBlocks }],
+                        lineItems: [{ price: 'price_1RzEPKIpvwwhCV4xiGICIMM7', quantity: numBlocks }],
                         mode: 'payment',
                         successUrl: `${successUrl}&pending_id=${tempId}`,
                         clientReferenceId: tempId,
