@@ -449,7 +449,6 @@
             return;
         }
 
-        // Show the persistent "Preparing your pixels..." message
         showMessage('Preparing your pixels...', 'info', null);
 
         try {
@@ -464,13 +463,17 @@
                     const result = await uploadImage({ imageB64: imageB64 });
                     const downloadURL = result.data.downloadURL;
 
+                    let linkUrl = document.getElementById('link-url').value;
+                    if (!/^https?:\/\//i.test(linkUrl)) {
+                        linkUrl = 'https://' + linkUrl;
+                    }
+
                     const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
                     const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
                     const cancelUrl = window.location.href.split('?')[0];
                     const tempId = `temp_${Date.now()}`;
                     const tempDocRef = doc(db, "pending_pixels", tempId);
 
-                    // 8. Save the data to a temporary "pending" document in Firestore
                     await setDoc(tempDocRef, {
                         ...selectionRect,
                         title: document.getElementById('title').value,
@@ -479,7 +482,6 @@
                         purchaseDate: new Date().toISOString()
                     });
 
-                    // The redirect to Stripe will happen here, so we don't need to hide the message
                     stripe.redirectToCheckout({
                         lineItems: [{ price: 'price_1RyZNURLgtQ8ebqOMrbWRaLJ', quantity: numBlocks }],
                         mode: 'payment',
@@ -490,7 +492,6 @@
 
                 } catch (error) {
                     console.error("Error calling uploadImage function: ", error);
-                    // If there's an error, show a new error message (which will replace the persistent one)
                     showMessage('Image upload failed. Please try a different image.', 'error');
                 }
             };
