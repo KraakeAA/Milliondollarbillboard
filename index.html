@@ -51,9 +51,52 @@
         ::-webkit-scrollbar-track { background: #1a1a1a; }
         ::-webkit-scrollbar-thumb { background: #0891b2; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+
+        #stats-bar {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            background-color: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #333;
+            z-index: 50;
+            font-size: 0.9rem;
+        }
+        #stats-bar div {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #stats-bar span {
+            color: #a0aec0; /* gray-500 */
+        }
+        #stats-bar p {
+            color: #ffffff;
+            font-weight: 700;
+        }
+        #pixels-sold-top {
+            color: #2dd4bf; /* cyan-400 */
+        }
     </style>
 </head>
 <body class="text-gray-200 overflow-x-hidden">
+
+    <div id="stats-bar">
+        <div>
+            <span>Sold:</span>
+            <p id="pixels-sold-top">0</p>
+        </div>
+        <div>
+            <span>Remaining:</span>
+            <p id="pixels-remaining-top">1,000,000</p>
+        </div>
+    </div>
 
     <header class="text-center py-8 md:py-12">
         <h1 class="text-4xl md:text-6xl font-black uppercase tracking-wider text-white">
@@ -83,21 +126,6 @@
                 </div>
             </div>
             <div class="billboard-stand"></div>
-        </div>
-
-        <div class="flex flex-col md:flex-row justify-around items-center bg-gray-900 bg-opacity-70 rounded-xl p-6 mb-8 border border-gray-700 max-w-4xl mx-auto">
-            <div class="text-center md:text-left mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Pricing</p>
-                <p class="text-3xl font-bold text-white">$100 <span class="text-lg font-normal text-gray-300">/ 10x10 block</span></p>
-            </div>
-            <div class="text-center mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Pixels Sold</p>
-                <p id="pixels-sold" class="text-3xl font-bold text-cyan-400">0</p>
-            </div>
-            <div class="text-center mb-4 md:mb-0">
-                <p class="text-sm text-gray-400 uppercase tracking-widest">Remaining</p>
-                <p id="pixels-remaining" class="text-3xl font-bold text-white">1,000,000</p>
-            </div>
         </div>
     </main>
 
@@ -209,8 +237,10 @@
             return acc + (width * height);
         }, 0);
         const totalPixels = GRID_SIZE * GRID_SIZE;
-        document.getElementById('pixels-sold').textContent = totalSoldPixels.toLocaleString();
-        document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
+        
+        // Update new top bar stats
+        document.getElementById('pixels-sold-top').textContent = totalSoldPixels.toLocaleString();
+        document.getElementById('pixels-remaining-top').textContent = (totalPixels - totalSoldPixels).toLocaleString();
     }
 
     function showMessage(text, type = 'info', timeout = 4000) {
@@ -444,36 +474,44 @@
     const stripe = Stripe('pk_test_51Rxl1vRLgtQ8ebqObjsgYdBwbC5NImjmN4RWYNSBvm1MKNCNKLcthyQVjXKLpUvJHmgks2J8Et6xqmhKX6OIW7jE00duPsSyyk');
     
     document.getElementById('checkout-button').addEventListener('click', async () => {
+        // 1. Check if all fields are filled
         if (!selectedFile || !document.getElementById('link-url').value || !document.getElementById('title').value) {
             showMessage('Please fill out all fields and upload an image.', 'error');
             return;
         }
 
+        // 2. Show a persistent "Preparing..." message that won't disappear
         showMessage('Preparing your pixels...', 'info', null);
 
         try {
+            // 3. Prepare to call our secure image upload function
             const uploadImage = httpsCallable(functions, 'uploadImage');
 
+            // 4. Read the user's selected image file
             const reader = new FileReader();
             reader.readAsDataURL(selectedFile);
             reader.onload = async () => {
                 const imageB64 = reader.result.split(',')[1];
                 
                 try {
+                    // 5. Call the function and wait for the final image URL
                     const result = await uploadImage({ imageB64: imageB64 });
                     const downloadURL = result.data.downloadURL;
 
+                    // 6. Get the user's link and add https:// if it's missing
                     let linkUrl = document.getElementById('link-url').value;
                     if (!/^https?:\/\//i.test(linkUrl)) {
                         linkUrl = 'https://' + linkUrl;
                     }
 
+                    // 7. Prepare all the data for Stripe and Firestore
                     const numBlocks = (selectionRect.w / PIXEL_BLOCK_SIZE) * (selectionRect.h / PIXEL_BLOCK_SIZE);
                     const successUrl = `${window.location.href.split('?')[0]}?session_id={CHECKOUT_SESSION_ID}`;
                     const cancelUrl = window.location.href.split('?')[0];
                     const tempId = `temp_${Date.now()}`;
                     const tempDocRef = doc(db, "pending_pixels", tempId);
 
+                    // 8. Save the data to a temporary "pending" document in Firestore
                     await setDoc(tempDocRef, {
                         ...selectionRect,
                         title: document.getElementById('title').value,
@@ -482,6 +520,7 @@
                         purchaseDate: new Date().toISOString()
                     });
 
+                    // 9. Redirect the user to Stripe for payment
                     stripe.redirectToCheckout({
                         lineItems: [{ price: 'price_1RyZNURLgtQ8ebqOMrbWRaLJ', quantity: numBlocks }],
                         mode: 'payment',
@@ -491,16 +530,19 @@
                     });
 
                 } catch (error) {
+                    // Handle errors from the image upload function
                     console.error("Error calling uploadImage function: ", error);
                     showMessage('Image upload failed. Please try a different image.', 'error');
                 }
             };
             reader.onerror = (error) => {
+                // Handle errors from reading the file
                 console.error("File Reader error: ", error);
                 showMessage('Could not read the selected file.', 'error');
             };
 
         } catch(error) {
+            // Handle any other errors
             console.error("Error preparing for checkout: ", error);
             showMessage('Could not prepare your purchase.', 'error');
         }
