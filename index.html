@@ -213,19 +213,35 @@
         document.getElementById('pixels-remaining').textContent = (totalPixels - totalSoldPixels).toLocaleString();
     }
 
-    function showMessage(text, type = 'info') {
+    function showMessage(text, type = 'info', timeout = 4000) {
         const container = document.getElementById('message-container');
+        // Look for an existing persistent message and remove it
+        const existingPersistentMessage = container.querySelector('[data-persistent="true"]');
+        if (existingPersistentMessage) {
+            existingPersistentMessage.remove();
+        }
+
         const messageDiv = document.createElement('div');
         const iconClass = type === 'success' ? 'gg-check' : 'gg-info';
-        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-blue-500';
+        const bgColor = type === 'success' ? 'bg-green-500' : (type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+        
         messageDiv.className = `flex items-center ${bgColor} text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full opacity-0`;
         messageDiv.innerHTML = `<i class="${iconClass} mr-3"></i> <p>${text}</p>`;
+        
+        // If there is no timeout, mark the message as persistent
+        if (timeout === null) {
+            messageDiv.dataset.persistent = "true";
+        }
+
         container.appendChild(messageDiv);
         setTimeout(() => messageDiv.classList.remove('translate-x-full', 'opacity-0'), 10);
-        setTimeout(() => {
-            messageDiv.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => messageDiv.remove(), 300);
-        }, 4000);
+        
+        if (timeout !== null) {
+            setTimeout(() => {
+                messageDiv.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => messageDiv.remove(), 300);
+            }, timeout);
+        }
     }
 
     const pixelsCollection = collection(db, "pixels");
@@ -433,7 +449,8 @@
             return;
         }
 
-        showMessage('Preparing your pixels...', 'info');
+        // Show the persistent "Preparing your pixels..." message
+        showMessage('Preparing your pixels...', 'info', null);
 
         try {
             const uploadImage = httpsCallable(functions, 'uploadImage');
@@ -461,6 +478,7 @@
                         purchaseDate: new Date().toISOString()
                     });
 
+                    // The redirect to Stripe will happen here, so we don't need to hide the message
                     stripe.redirectToCheckout({
                         lineItems: [{ price: 'price_1RyZNURLgtQ8ebqOMrbWRaLJ', quantity: numBlocks }],
                         mode: 'payment',
@@ -471,6 +489,7 @@
 
                 } catch (error) {
                     console.error("Error calling uploadImage function: ", error);
+                    // If there's an error, show a new error message (which will replace the persistent one)
                     showMessage('Image upload failed. Please try a different image.', 'error');
                 }
             };
