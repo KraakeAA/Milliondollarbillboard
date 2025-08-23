@@ -470,10 +470,11 @@
                     const tempId = `temp_${Date.now()}`;
                     const tempDocRef = doc(db, "pending_pixels", tempId);
 
+                    // 8. Save the data to a temporary "pending" document in Firestore
                     await setDoc(tempDocRef, {
                         ...selectionRect,
                         title: document.getElementById('title').value,
-                        link: document.getElementById('link-url').value,
+                        link: linkUrl,
                         img: downloadURL,
                         purchaseDate: new Date().toISOString()
                     });
